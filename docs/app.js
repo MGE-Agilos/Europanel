@@ -125,6 +125,10 @@ async function loadAllPageData() {
 }
 
 async function savePageData(pageId, data) {
+  if (!state.submission) {
+    toast('Session not ready — please refresh the page.', 'error');
+    return;
+  }
   setSaveStatus('saving');
   try {
     const { error } = await sb
@@ -563,23 +567,14 @@ async function init() {
   // Show auth screen immediately — don't wait for Supabase
   showAuthScreen();
 
-  // Listen for auth state changes
+  // Listen for auth state changes — only act on explicit SIGNED_OUT
   sb.auth.onAuthStateChange(async (event, session) => {
-    if (session?.user) {
-      state.user = session.user;
-      try {
-        await loadOrCreateSubmission();
-        showApp();
-      } catch (err) {
-        toast('Failed to load submission: ' + err.message, 'error');
-        showAuthScreen();
-      }
-    } else {
+    if (event === 'SIGNED_OUT' || !session?.user) {
       showAuthScreen();
     }
   });
 
-  // Restore existing session in background
+  // Restore existing session in background (single source of truth)
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (session?.user) {
