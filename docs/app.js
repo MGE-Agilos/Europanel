@@ -48,6 +48,10 @@ const state = {
 // ─── Supabase client ─────────────────────────────────────────────────────────
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   db: { schema: 'europanel' },
+  auth: {
+    // Disable Web Locks API — prevents getSession() from hanging in some browsers
+    lock: async (_name, _timeout, fn) => fn(),
+  },
 });
 
 /* ══════════════════════════════════════════════════════════════════════
