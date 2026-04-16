@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WBP BREF — EuroPanel Data Collection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Auth screen -->
+  <div id="auth-screen" class="auth-screen hidden">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="auth-brand-badge">JRC · EIPPCB</div>
+        <h1 class="auth-title">WBP BREF Data Collection</h1>
+        <p class="auth-subtitle">IED 2010/75/EU · Activity 6.1(c) · European IPPC Bureau</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab auth-tab-active" data-tab="login">Sign in</button>
+        <button class="auth-tab" data-tab="register">Register</button>
+      </div>
+
+      <form id="auth-form" novalidate>
+        <div class="form-group">
+          <label class="form-label form-label-required" for="auth-email">E-mail</label>
+          <input class="form-input" type="email" id="auth-email" required autocomplete="email" placeholder="you@organisation.eu">
+        </div>
+        <div class="form-group">
+          <label class="form-label form-label-required" for="auth-password">Password</label>
+          <input class="form-input" type="password" id="auth-password" required autocomplete="current-password" placeholder="••••••••">
+        </div>
+        <div id="auth-error" class="auth-error hidden"></div>
+        <button type="submit" class="btn btn-primary btn-full" id="auth-submit">Sign in</button>
+      </form>
+
+      <p class="auth-footer">
+        Contact <a href="mailto:JRC-IPTS-EIPPCB@ec.europa.eu">JRC-IPTS-EIPPCB@ec.europa.eu</a> for access.
+      </p>
+    </div>
+  </div>
+
+  <!-- App shell -->
+  <div id="app-shell" class="app-shell hidden">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <span class="sidebar-brand-badge">EIPPCB</span>
+          <span class="sidebar-brand-name">EuroPanel</span>
+        </div>
+        <div class="sidebar-progress">
+          <div class="sidebar-progress-bar">
+            <div class="sidebar-progress-fill" id="progress-fill"></div>
+          </div>
+          <span class="sidebar-progress-label" id="progress-label">0 / 11 complete</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" id="sidebar-nav" aria-label="Form pages">
+        <!-- Populated by JS -->
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user" id="sidebar-user"></div>
+        <button class="sidebar-signout" id="btn-signout">Sign out</button>
+      </div>
+    </aside>
+
+    <!-- Main content area -->
+    <main id="main-area" class="main-area">
+      <div id="page-container">
+        <!-- Page content rendered here -->
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Toast notifications -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- App scripts (order matters) -->
+  <script src="pages-0-6.js"></script>
+  <script src="pages-7-12.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
