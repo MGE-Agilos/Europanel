@@ -336,7 +336,7 @@ function renderPage2(data) {
   const chipRows = CHIP_ROWS.map(row => {
     const cols = ['debark','chip','other_chip'].map(col => {
       if (row.type === 'yn') return `<td class="prod-td">${ynSel(data, `s22_${col}_${row.key}`)}</td>`;
-      return `<td class="prod-td"><input class="form-input form-input-sm" type="text" name="s22_${col}_${row.key}" value="${v(data,`s22_${col}_${row.key`)}"></td>`;
+      return `<td class="prod-td"><input class="form-input form-input-sm" type="text" name="s22_${col}_${row.key}" value="${v(data,`s22_${col}_${row.key}`)}"></td>`;
     }).join('');
     return `<tr class="prod-row"><td class="prod-td cu-td-label">${row.label}${row.unit?` <span class="form-hint">(${row.unit})</span>`:''}</td>${cols}
       <td class="prod-td"><input class="form-input form-input-sm" type="text" name="s22_comments_${row.key}" value="${v(data,`s22_comments_${row.key}`)}"></td></tr>`;
@@ -615,7 +615,7 @@ function renderPage4(data) {
   const cuCols = cus.map(ci => `<th class="prod-th cu-th-col" data-cu="${ci}">CU${ci}${ci>4?`<button type="button" class="cu-remove-btn" data-cu="${ci}" aria-label="Remove CU${ci}">✕</button>`:''}</th>`).join('');
 
   function cuRow(label, unit, field) {
-    return `<tr class="prod-row"><td class="prod-td cu-td-label">${label}</td><td class="prod-td cu-td-unit">${unit}</td>${cus.map(ci=>`<td class="prod-td"><input class="form-input" type="number" min="0" step="any" name="cu_${ci}_${field}" value="${v(data,`cu_${ci}_${field`)}"></td>`).join('')}</tr>`;
+    return `<tr class="prod-row"><td class="prod-td cu-td-label">${label}</td><td class="prod-td cu-td-unit">${unit}</td>${cus.map(ci=>`<td class="prod-td"><input class="form-input" type="number" min="0" step="any" name="cu_${ci}_${field}" value="${v(data,`cu_${ci}_${field}`)}"></td>`).join('')}</tr>`;
   }
   function cuRowText(label, field, placeholder='') {
     return `<tr class="prod-row"><td class="prod-td cu-td-label">${label}</td><td class="prod-td cu-td-unit"></td>${cus.map(ci=>`<td class="prod-td"><input class="form-input form-input-sm" type="text" name="cu_${ci}_${field}" value="${v(data,`cu_${ci}_${field}`)}" placeholder="${placeholder}"></td>`).join('')}</tr>`;
