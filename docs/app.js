@@ -82,7 +82,6 @@ async function signOut() {
    SUBMISSION MANAGEMENT
    ══════════════════════════════════════════════════════════════════════ */
 async function loadOrCreateSubmission() {
-  console.log('[EP] loadOrCreateSubmission start, user:', state.user?.id);
   // Try to load existing draft
   const { data: subs, error } = await sb
     .from('submissions')
@@ -92,7 +91,6 @@ async function loadOrCreateSubmission() {
     .order('created_at', { ascending: false })
     .limit(1);
 
-  console.log('[EP] submissions query result:', { subs, error });
   if (error) throw error;
 
   if (subs && subs.length > 0) {
