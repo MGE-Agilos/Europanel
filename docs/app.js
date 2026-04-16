@@ -548,6 +548,9 @@ async function init() {
   setupAuthUI();
   setupSidebarEvents();
 
+  // Show auth screen immediately — don't wait for Supabase
+  showAuthScreen();
+
   // Listen for auth state changes
   sb.auth.onAuthStateChange(async (event, session) => {
     if (session?.user) {
@@ -564,13 +567,16 @@ async function init() {
     }
   });
 
-  // Check existing session — show auth screen on any failure
+  // Restore existing session in background
   try {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) showAuthScreen();
+    if (session?.user) {
+      state.user = session.user;
+      await loadOrCreateSubmission();
+      showApp();
+    }
   } catch (err) {
-    console.error('Supabase init error:', err);
-    showAuthScreen();
+    console.error('Supabase session check failed:', err);
   }
 }
 
