@@ -8,7 +8,7 @@
 // ─── Config ──────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://vxwmhsgxoomcbiukeinp.supabase.co';
 // Publishable / anon key — find it in: Dashboard → Project Settings → API
-const SUPABASE_KEY = 'sb_publishable_UR56UpHfs2xsBvv0gqpL7g_ItlxKh6c';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4d21oc2d4b29tY2JpdWtlaW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyNTMwODUsImV4cCI6MjA5MTgyOTA4NX0.DYfan7mRM0dYkB9xouBjb2Y1ONdmZxByrsr29nSZuAE';
 
 // ─── Page manifest ────────────────────────────────────────────────────────────
 const PAGES = [
