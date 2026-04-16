@@ -564,9 +564,14 @@ async function init() {
     }
   });
 
-  // Check existing session
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) showAuthScreen();
+  // Check existing session — show auth screen on any failure
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) showAuthScreen();
+  } catch (err) {
+    console.error('Supabase init error:', err);
+    showAuthScreen();
+  }
 }
 
 // Bootstrap
