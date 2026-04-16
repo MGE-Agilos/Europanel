@@ -508,18 +508,26 @@ function setupAuthUI() {
 
     try {
       if (state.authMode === 'login') {
-        await signIn(email, password);
+        const data = await signIn(email, password);
+        if (data?.user) {
+          state.user = data.user;
+          await loadOrCreateSubmission();
+          showApp();
+        }
       } else {
-        const { data } = await signUp(email, password);
+        const data = await signUp(email, password);
         if (data?.user && !data?.session) {
           errDiv.textContent = 'Check your email to confirm your account, then sign in.';
           errDiv.classList.remove('hidden');
           submit.disabled = false;
           submit.textContent = 'Create account';
           return;
+        } else if (data?.user) {
+          state.user = data.user;
+          await loadOrCreateSubmission();
+          showApp();
         }
       }
-      // Auth state change will handle the rest
     } catch (err) {
       errDiv.textContent = err.message || 'Authentication failed.';
       errDiv.classList.remove('hidden');
