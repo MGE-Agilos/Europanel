@@ -114,7 +114,7 @@ function renderPage7(data) {
           <div class="form-group"><label class="form-label">Emission point ID</label>
             <input class="form-input" type="text" name="ep_${ei}_id" value="${ed('id')}" placeholder="e.g. EP-01"></div>
           <div class="form-group"><label class="form-label">Reference year</label>
-            <input class="form-input" type="text" name="ep_${ei}_ref_year" value="${ed('ref_year')}" placeholder="e.g. 2010"></div>
+            <input class="form-input" type="text" name="ep_${ei}_ref_year" value="${ed('ref_year')}" placeholder="e.g. 2024"></div>
           <div class="form-group form-group-wide"><label class="form-label">Waste gas streams channelled to this emission point</label>
             <textarea class="form-textarea" name="ep_${ei}_waste_gas_desc" rows="2" placeholder="Describe sources/streams, reference to Sheet 6 technique IDs…">${ed('waste_gas_desc')}</textarea></div>
           <div class="form-group form-group-wide"><label class="form-label">Reference conditions for values entered</label>
@@ -247,7 +247,7 @@ function renderPage8(data) {
           <div class="form-group"><label class="form-label">Discharge point ID</label>
             <input class="form-input" type="text" name="ww_${wi}_discharge_id" value="${wd('discharge_id')}" placeholder="e.g. DP-01"></div>
           <div class="form-group"><label class="form-label">Reference year</label>
-            <input class="form-input" type="text" name="ww_${wi}_ref_year" value="${wd('ref_year')}" placeholder="e.g. 2010"></div>
+            <input class="form-input" type="text" name="ww_${wi}_ref_year" value="${wd('ref_year')}" placeholder="e.g. 2024"></div>
         </div>
 
         <!-- Waste water sources -->

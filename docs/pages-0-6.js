@@ -36,10 +36,10 @@ function navFooter(pageId) {
   </footer>`;
 }
 function refYearRadios(data) {
-  return ['2009','2010','2011'].map(yr =>
+  return ['2023','2024','2025'].map(yr =>
     `<label class="form-radio-label">
-      <input class="form-radio-input" type="radio" name="ref_year" value="${yr}" ${chk(data,'ref_year',yr) || (yr==='2010' && !data.ref_year ? 'checked' : '')}>
-      ${yr}${yr==='2010' ? ' <span class="form-hint">(preferred)</span>' : ''}
+      <input class="form-radio-input" type="radio" name="ref_year" value="${yr}" ${chk(data,'ref_year',yr) || (yr==='2024' && !data.ref_year ? 'checked' : '')}>
+      ${yr}${yr==='2024' ? ' <span class="form-hint">(preferred)</span>' : ''}
     </label>`
   ).join('');
 }
@@ -65,17 +65,17 @@ function renderPage0(data) {
           <span class="doc-header-issuer-org">Joint Research Centre · European Commission</span>
           <span class="doc-header-issuer-unit">Institute for Prospective Technological Studies (Seville) · European IPPC Bureau</span>
         </div>
-        <span class="doc-header-date">Seville, 27 July 2012</span>
+        <span class="doc-header-date">Seville, 27 July 2026</span>
       </div>
       <div class="doc-header-title-block">
         <p class="doc-header-title">Questionnaire for Collecting Plant-Specific Data for the Drafting of the BAT Reference Document (BREF) for the Production of Wood-Based Panels (WBP)</p>
-        <p class="doc-header-legal">IED 2010/75/EU · Activity 6.1(c), Annex I · Reference year: 2010</p>
+        <p class="doc-header-legal">IED 2010/75/EU · Activity 6.1(c), Annex I · Reference year: 2024</p>
       </div>
     </div>
     <div style="padding:var(--space-4) var(--space-6)">
       <div class="doc-notice doc-notice-deadline">
         <span class="doc-notice-icon">📅</span>
-        <p><strong>Submission deadline:</strong> Submit to your Member State representative by <strong>Thursday 27 September 2012</strong>.</p>
+        <p><strong>Submission deadline:</strong> Submit to your Member State representative by <strong>Thursday 27 September 2026</strong>.</p>
       </div>
       <div class="doc-notice doc-notice-confidential">
         <span class="doc-notice-icon">🔒</span>
@@ -259,7 +259,7 @@ function renderPage1(data) {
         <div class="sheet-field"><input class="form-input" type="text" id="company" name="company" value="${v(data,'company')}"></div>
       </div>
       <div class="sheet-row">
-        <div class="sheet-label"><span class="sheet-row-num">1.5</span><label class="form-label">Reference year <span class="form-hint">(prefer 2010)</span></label></div>
+        <div class="sheet-label"><span class="sheet-row-num">1.5</span><label class="form-label">Reference year <span class="form-hint">(prefer 2024)</span></label></div>
         <div class="sheet-field"><div class="form-radio-group">${refYearRadios(data)}</div></div>
       </div>
     </div>
@@ -750,7 +750,7 @@ function renderPage5(data) {
         <div class="prod-table-wrap">
           <table class="prod-table"><tbody>
             <tr class="prod-row"><td class="prod-td cu-td-label" style="width:340px">Reference year</td>
-              <td class="prod-td"><div class="form-radio-group">${['2009','2010','2011'].map(yr=>`<label class="form-radio-label"><input class="form-radio-input" type="radio" name="dryer_${di}_ref_year" value="${yr}" ${chk(data,`dryer_${di}_ref_year`,yr)||(yr==='2010'&&!data[`dryer_${di}_ref_year`]?'checked':'')}> ${yr}</label>`).join('')}</div></td></tr>
+              <td class="prod-td"><div class="form-radio-group">${['2023','2024','2025'].map(yr=>`<label class="form-radio-label"><input class="form-radio-input" type="radio" name="dryer_${di}_ref_year" value="${yr}" ${chk(data,`dryer_${di}_ref_year`,yr)||(yr==='2024'&&!data[`dryer_${di}_ref_year`]?'checked':'')}> ${yr}</label>`).join('')}</div></td></tr>
             <tr class="prod-row"><td class="prod-td cu-td-label">Main type of dryer</td>
               <td class="prod-td"><select class="form-select" name="dryer_${di}_main_type">${typeOpts}</select></td></tr>
             <tr class="prod-row"><td class="prod-td cu-td-label">Describe the dryer type and system set-up</td>
@@ -816,7 +816,7 @@ function renderPage5(data) {
         <div class="prod-table-wrap">
           <table class="prod-table"><tbody>
             <tr class="prod-row"><td class="prod-td cu-td-label" style="width:340px">Reference year</td>
-              <td class="prod-td"><div class="form-radio-group">${['2009','2010','2011'].map(yr=>`<label class="form-radio-label"><input class="form-radio-input" type="radio" name="press_${pi}_ref_year" value="${yr}" ${chk(data,`press_${pi}_ref_year`,yr)||(yr==='2010'&&!data[`press_${pi}_ref_year`]?'checked':'')}> ${yr}</label>`).join('')}</div></td></tr>
+              <td class="prod-td"><div class="form-radio-group">${['2023','2024','2025'].map(yr=>`<label class="form-radio-label"><input class="form-radio-input" type="radio" name="press_${pi}_ref_year" value="${yr}" ${chk(data,`press_${pi}_ref_year`,yr)||(yr==='2024'&&!data[`press_${pi}_ref_year`]?'checked':'')}> ${yr}</label>`).join('')}</div></td></tr>
             <tr class="prod-row"><td class="prod-td cu-td-label">Main type of press</td>
               <td class="prod-td"><select class="form-select" name="press_${pi}_main_type">${typeOpts}</select></td></tr>
             <tr class="prod-row"><td class="prod-td cu-td-label">Describe the press line set-up</td>
