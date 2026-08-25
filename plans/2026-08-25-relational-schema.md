@@ -650,7 +650,10 @@ Dans `docs/fields.js`, à l'intérieur de `SCHEMA`, après `contacts` :
 ```js
     press_dryer_section: {
       kind: 'one', page: 5,
-      cols: { dryer_count: 'int', press_count: 'int', comments: 'text' },
+      // Pas de dryer_count ni press_count : un compteur derivable de COUNT(*)
+      // n'a pas a occuper une colonne. Il est declare en countField sur la
+      // section repetable, et hydrate depuis le nombre de lignes rendues.
+      cols: { comments: 'text' },
     },
 
     dryers: {
@@ -990,11 +993,8 @@ Dans `docs/fields.js`, ajouter à `LISTS` :
 Puis dans `SCHEMA` :
 
 ```js
-    air_emissions_section: {
-      kind: 'one', page: 7,
-      cols: { ep_count: 'int' },
-    },
-
+    // Pas de table air_emissions_section : elle n'aurait porte que ep_count,
+    // derivable du nombre de points d'emission.
     emission_points: {
       kind: 'many', page: 7, pattern: 'ep_{idx}_{col}', countField: 'ep_count',
       // Le champ HTML est ep_N_id ; la colonne ne peut pas s'appeler id,
@@ -1250,13 +1250,29 @@ test('chaque champ littéral des renderers a une colonne déclarée', () => {
     'champs sans colonne dans le manifeste : ' + missing.join(', '));
 });
 
-test('le manifeste couvre les 35 tables du questionnaire', () => {
-  // 12 tables 1:1 de page + 23 tables enfants.
+test('le manifeste couvre les 33 tables du questionnaire', () => {
+  // 10 tables 1:1 de page + 23 tables enfants.
   // Les 7 tables du noyau (plants, cycles, ref_lists, submission_pages,
   // audit_log, companies, submissions) ne portent aucun champ de
   // questionnaire : elles sont ecrites a la main, hors manifeste.
-  // 35 + 7 = les 42 tables annoncees par la spec section 4.4.
-  assert.strictEqual(Object.keys(SCHEMA).length, 35);
+  // 33 + 7 = 40 tables au total (la spec annoncait 42 avant retrait des
+  // deux tables qui n'existaient que pour porter un compteur).
+  assert.strictEqual(Object.keys(SCHEMA).length, 33);
+});
+
+test('aucun compteur d’instances n’est stocke en colonne', () => {
+  // Un compteur est derivable de COUNT(*). Le stocker cree une seconde source
+  // de verite qui peut deriver de la premiere : deux tables de la meme page
+  // ecrivaient alors la meme cle a l'hydratation, et l'ordre de declaration
+  // dans le manifeste decidait silencieusement laquelle gagnait.
+  const counters = new Set(Object.values(SCHEMA)
+    .map(e => e.countField).filter(Boolean));
+  for (const [name, e] of Object.entries(SCHEMA)) {
+    for (const col of Object.keys(e.cols)) {
+      assert.ok(!counters.has(col),
+        `${name}.${col} est un compteur : le declarer en countField, pas en colonne`);
+    }
+  }
 });
 
 test('toute page declaree existe reellement', () => {
@@ -1400,7 +1416,7 @@ Les entrées déjà écrites aux tâches 2, 6, 7 et 8 sont conservées telles qu
 
     // ── Page 4 ───────────────────────────────────────────────────────
     energy_production: { kind:'one', page:4, cols:{
-      cu_count:'int', s41_diagram_ref:'text', s43_cold_startups:'num',
+      s41_diagram_ref:'text', s43_cold_startups:'num',
       s43_warm_startups:'num', s43_maintenance_desc:'text', comments:'text' } },
 
     combustion_units: { kind:'many', page:4, pattern:'cu_{idx}_{col}',
@@ -1425,7 +1441,7 @@ Les entrées déjà écrites aux tâches 2, 6, 7 et 8 sont conservées telles qu
 
     // ── Page 6 ───────────────────────────────────────────────────────
     abatement_section: { kind:'one', page:6, cols:{
-      tech_count:'int', s62_equip_desc:'text', s62_dust_fate:'text',
+      s62_equip_desc:'text', s62_dust_fate:'text',
       s62_monitoring:'text', s62_control_measures:'text', s62_comments:'text' } },
 
     abatement_techniques: { kind:'many', page:6, pattern:'tech_{idx}_{col}',
@@ -1442,8 +1458,7 @@ Les entrées déjà écrites aux tâches 2, 6, 7 et 8 sont conservées telles qu
       cols:{ spec:'text' } },
 
     // ── Page 8 ───────────────────────────────────────────────────────
-    water_emissions_section: { kind:'one', page:8, cols:{ ww_count:'int' } },
-
+    // Pas de table water_emissions_section, pour la meme raison.
     wastewater_streams: { kind:'many', page:8, pattern:'ww_{idx}_{col}',
       countField:'ww_count', cols:{
       discharge_id:'text', ref_year:'int', wwtp_desc:'text', sludge_fate:'text' } },
@@ -1458,7 +1473,7 @@ Les entrées déjà écrites aux tâches 2, 6, 7 et 8 sont conservées telles qu
 
     // ── Page 9 ───────────────────────────────────────────────────────
     solid_residues_section: { kind:'one', page:9, cols:{
-      waste_row_count:'int', waste_bat_techniques:'text', waste_comments:'text' } },
+      waste_bat_techniques:'text', waste_comments:'text' } },
 
     solid_residues: { kind:'many', page:9, pattern:'waste_{idx}_{col}',
       countField:'waste_row_count', aliases:{ description:'desc' }, cols:{

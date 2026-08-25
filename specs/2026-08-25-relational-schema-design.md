@@ -40,7 +40,7 @@ la traduit vers les tables à l'écriture, et la reconstruit depuis les tables �
 lecture.
 
 ```
-renderers  ⇄  état plat {nom: valeur}  ⇄  dispatcher + manifeste  ⇄  ~42 tables
+renderers  ⇄  état plat {nom: valeur}  ⇄  dispatcher + manifeste  ⇄  ~40 tables
  inchangé          inchangé                    NOUVEAU               NOUVEAU
 ```
 
@@ -131,7 +131,7 @@ historique d'audit complet). Les ajouter maintenant évite une seconde migration
 **Cette itération crée les tables et les colonnes ; elle n'implémente pas les
 fonctionnalités de workflow associées.**
 
-### 4.2 Tables 1:1 de page (12 tables)
+### 4.2 Tables 1:1 de page (10 tables)
 
 | Page | Table | Colonnes |
 |---|---|---|
@@ -139,22 +139,27 @@ fonctionnalités de workflow associées.**
 | 1 | `general_info` | 6 — `plant_name`, `production_started`, `location_city`, `location_country`, `company`, `comments` |
 | 2 | `plant_layout` | 6 — `s21_comments`, `s22_comments`, `s23_present`, `s23_dust_method`, `s23_monitoring`, `s23_comments` |
 | 3 | `raw_materials_section` | 1 — `s32_comments` |
-| 4 | `energy_production` | 6 — `cu_count`, `s41_diagram_ref`, `s43_cold_startups`, `s43_warm_startups`, `s43_maintenance_desc`, `comments` |
-| 5 | `press_dryer_section` | 3 — `dryer_count`, `press_count`, `comments` |
-| 6 | `abatement_section` | 6 — `tech_count`, `s62_equip_desc`, `s62_dust_fate`, `s62_monitoring`, `s62_control_measures`, `s62_comments` |
-| 7 | `air_emissions_section` | 1 — `ep_count` |
-| 8 | `water_emissions_section` | 1 — `ww_count` |
-| 9 | `solid_residues_section` | 3 — `waste_row_count`, `waste_bat_techniques`, `waste_comments` |
+| 4 | `energy_production` | 5 — `s41_diagram_ref`, `s43_cold_startups`, `s43_warm_startups`, `s43_maintenance_desc`, `comments` |
+| 5 | `press_dryer_section` | 1 — `comments` |
+| 6 | `abatement_section` | 5 — `s62_equip_desc`, `s62_dust_fate`, `s62_monitoring`, `s62_control_measures`, `s62_comments` |
+| 9 | `solid_residues_section` | 2 — `waste_bat_techniques`, `waste_comments` |
 | 10 | `water_consumption` | 10 — `wc_process`, `wc_steam`, `wc_cooling`, `wc_sanitary`, `wc_other`, `wc_refining_total`, `wc_refining_recycled`, `wc_recycling_savings`, `wc_bat_techniques`, `wc_comments` |
 | 11 | `bat_candidate` | 17 — `bat_name`, `bat_plant_name`, `bat_tech_desc`, `bat_reference_plants`, `bat_install_year`, `bat_rd_level`, `bat_tech_comments`, `bat_env_*` (4), `bat_invest_cost`, `bat_oper_cost`, `bat_cost_effectiveness`, `bat_cross_media`, `bat_applicability`, `bat_references` |
 
 La page 12 (Review & Submit) ne porte aucun champ : elle ne produit pas de table.
 
-Les colonnes `*_count` (`cu_count`, `dryer_count`, `ep_count`…) sont conservées telles
-quelles. Elles sont redondantes avec `COUNT(*)` sur la table enfant, mais les renderers
-s'en servent pour reconstruire le nombre d'instances avant de lire les données. Elles
-sont recalculées à l'écriture depuis la table enfant, ce qui les rend cohérentes par
-construction.
+Les champs `*_count` (`cu_count`, `dryer_count`, `ep_count`…) ne sont **pas** stockés.
+Ils sont entièrement dérivables de `COUNT(*)` sur la table enfant, et les stocker
+créerait une seconde source de vérité susceptible de diverger de la première. Ils sont
+déclarés en `countField` sur l'entrée répétable, et reconstruits à l'hydratation depuis
+le nombre de lignes rendues par la base.
+
+Ce choix supprime deux tables qui n'auraient existé que pour porter un entier —
+`air_emissions_section` et `water_emissions_section` — et élimine un défaut réel : ces
+tables et leur table enfant écrivaient la même clé dans la carte plate à l'hydratation,
+si bien que l'ordre de déclaration dans le manifeste décidait silencieusement laquelle
+l'emportait. Un compteur périmé pouvait alors ressusciter une instance supprimée par
+l'opérateur.
 
 ### 4.3 Tables enfants (23 tables)
 
@@ -263,7 +268,10 @@ Codes : `energy`, `rawmat`, `water`, `emissions`, `primary_other`, `air`, `ww`,
 
 ### 4.4 Total
 
-7 noyau + 12 tables de page + 23 tables enfants = **42 tables**.
+7 noyau + 10 tables de page + 23 tables enfants = **40 tables**.
+
+Le manifeste en décrit 33 ; les 7 tables du noyau ne portent aucun champ de
+questionnaire et sont écrites à la main.
 
 ---
 
@@ -407,7 +415,7 @@ métier n'est absente du manifeste.
 
 ## 9. Sécurité (RLS)
 
-Les 42 tables portent `ENABLE ROW LEVEL SECURITY`. Les politiques suivent le modèle
+Les 40 tables portent `ENABLE ROW LEVEL SECURITY`. Les politiques suivent le modèle
 existant, en remontant la chaîne de parenté jusqu'à `submissions.user_id` :
 
 - tables 1:1 de page — `submission_id IN (SELECT id FROM submissions WHERE user_id = auth.uid())` ;
@@ -425,7 +433,7 @@ le DDL depuis le manifeste, et non écrites à la main table par table.
 
 | Fichier | Contenu |
 |---|---|
-| `supabase/migrations/002_relational_schema.sql` | DDL des 42 tables, index, triggers, politiques RLS |
+| `supabase/migrations/002_relational_schema.sql` | DDL des 40 tables, index, triggers, politiques RLS |
 | `supabase/migrations/003_seed_ref_lists.sql` | Seed des listes de valeurs, généré depuis les tableaux JS |
 | `docs/fields.js` | Manifeste |
 | `docs/db.js` | Dispatcher : `dispatch()`, `hydrate()` |
