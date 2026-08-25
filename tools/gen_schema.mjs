@@ -107,6 +107,10 @@ function tableDdl(table, entry) {
     cols.push([col, SQL_TYPE[type]]);
   }
 
+  // Colonne technique, pas un champ du questionnaire (spec § 3) : maintenue
+  // par le trigger émis dans triggerDdl, jamais par le manifeste.
+  cols.push(['updated_at', 'TIMESTAMPTZ NOT NULL DEFAULT NOW()']);
+
   if (entry.kind !== 'one') {
     const keyCol = entry.kind === 'many' ? 'idx' : 'code';
     constraints.push(`UNIQUE (${parentColumn(entry)}, ${keyCol})`);
@@ -131,6 +135,20 @@ function indexDdl(table, entry) {
   const col = parentColumn(entry);
   return `CREATE INDEX IF NOT EXISTS idx_ep_${table}_${col}\n` +
          `  ON europanel.${table}(${col});`;
+}
+
+/* ── Horodatage ───────────────────────────────────────────────────────────
+   updated_at (spec § 3) est maintenue par un trigger, pas par l'appelant :
+   réutilise europanel.set_updated_at(), défini une fois dans 001_schema.sql.
+   002 ne la redéfinit pas — 001 est un prérequis documenté en tête de ce
+   fichier, donc la fonction existe déjà quand 002 s'applique — pour éviter
+   deux définitions de la même fonction qui pourraient un jour diverger.
+   ────────────────────────────────────────────────────────────────────────── */
+function triggerDdl(table) {
+  return `DROP TRIGGER IF EXISTS trg_${table}_updated_at ON europanel.${table};\n` +
+         `CREATE TRIGGER trg_${table}_updated_at\n` +
+         `  BEFORE UPDATE ON europanel.${table}\n` +
+         '  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();';
 }
 
 /* ── Privilèges ───────────────────────────────────────────────────────────
@@ -192,7 +210,8 @@ CREATE TABLE IF NOT EXISTS europanel.plants (
   company_id  BIGINT REFERENCES europanel.companies(id) ON DELETE CASCADE,
   name        TEXT NOT NULL,
   country     TEXT,
-  created_at  TIMESTAMPTZ DEFAULT NOW()
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS europanel.cycles (
@@ -203,7 +222,8 @@ CREATE TABLE IF NOT EXISTS europanel.cycles (
   closes_at      DATE,
   status         TEXT NOT NULL DEFAULT 'draft'
                  CHECK (status IN ('draft','open','closed','archived')),
-  created_at     TIMESTAMPTZ DEFAULT NOW()
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS europanel.ref_lists (
@@ -213,6 +233,7 @@ CREATE TABLE IF NOT EXISTS europanel.ref_lists (
   unit        TEXT,
   sort_order  SMALLINT NOT NULL DEFAULT 0,
   active      BOOLEAN  NOT NULL DEFAULT TRUE,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (list_code, code)
 );
 
@@ -228,6 +249,7 @@ CREATE TABLE IF NOT EXISTS europanel.submission_pages (
                 CHECK (status IN ('empty','partial','complete')),
   raw           JSONB NOT NULL DEFAULT '{}',
   saved_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (submission_id, page_id)
 );
 
@@ -241,7 +263,8 @@ CREATE TABLE IF NOT EXISTS europanel.audit_log (
   value_before  TEXT,
   value_after   TEXT,
   submission_id BIGINT REFERENCES europanel.submissions(id) ON DELETE SET NULL,
-  occurred_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  occurred_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE europanel.submissions ADD COLUMN IF NOT EXISTS plant_id BIGINT
@@ -255,6 +278,35 @@ CREATE INDEX IF NOT EXISTS idx_ep_submission_pages_sub
   ON europanel.submission_pages(submission_id);
 CREATE INDEX IF NOT EXISTS idx_ep_audit_log_sub
   ON europanel.audit_log(submission_id);
+
+-- ─── Horodatage du noyau ──────────────────────────────────────────────
+-- Même trigger que les tables générées (voir triggerDdl) : réutilise
+-- europanel.set_updated_at(), défini dans 001_schema.sql, sans le
+-- redéfinir.
+DROP TRIGGER IF EXISTS trg_plants_updated_at ON europanel.plants;
+CREATE TRIGGER trg_plants_updated_at
+  BEFORE UPDATE ON europanel.plants
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_cycles_updated_at ON europanel.cycles;
+CREATE TRIGGER trg_cycles_updated_at
+  BEFORE UPDATE ON europanel.cycles
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_ref_lists_updated_at ON europanel.ref_lists;
+CREATE TRIGGER trg_ref_lists_updated_at
+  BEFORE UPDATE ON europanel.ref_lists
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_submission_pages_updated_at ON europanel.submission_pages;
+CREATE TRIGGER trg_submission_pages_updated_at
+  BEFORE UPDATE ON europanel.submission_pages
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_audit_log_updated_at ON europanel.audit_log;
+CREATE TRIGGER trg_audit_log_updated_at
+  BEFORE UPDATE ON europanel.audit_log
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 -- ─── RLS du noyau ─────────────────────────────────────────────────────
 ALTER TABLE europanel.plants            ENABLE ROW LEVEL SECURITY;
@@ -370,7 +422,7 @@ export function buildDdl() {
       tableDdl(table, entry));
     const idx = indexDdl(table, entry);
     if (idx) parts.push(idx);
-    parts.push('', grantsDdl(table), '', policiesDdl(table, entry), '');
+    parts.push('', triggerDdl(table), '', grantsDdl(table), '', policiesDdl(table, entry), '');
   }
 
   parts.push(

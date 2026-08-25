@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS europanel.plants (
   company_id  BIGINT REFERENCES europanel.companies(id) ON DELETE CASCADE,
   name        TEXT NOT NULL,
   country     TEXT,
-  created_at  TIMESTAMPTZ DEFAULT NOW()
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS europanel.cycles (
@@ -39,7 +40,8 @@ CREATE TABLE IF NOT EXISTS europanel.cycles (
   closes_at      DATE,
   status         TEXT NOT NULL DEFAULT 'draft'
                  CHECK (status IN ('draft','open','closed','archived')),
-  created_at     TIMESTAMPTZ DEFAULT NOW()
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS europanel.ref_lists (
@@ -49,6 +51,7 @@ CREATE TABLE IF NOT EXISTS europanel.ref_lists (
   unit        TEXT,
   sort_order  SMALLINT NOT NULL DEFAULT 0,
   active      BOOLEAN  NOT NULL DEFAULT TRUE,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (list_code, code)
 );
 
@@ -64,6 +67,7 @@ CREATE TABLE IF NOT EXISTS europanel.submission_pages (
                 CHECK (status IN ('empty','partial','complete')),
   raw           JSONB NOT NULL DEFAULT '{}',
   saved_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (submission_id, page_id)
 );
 
@@ -77,7 +81,8 @@ CREATE TABLE IF NOT EXISTS europanel.audit_log (
   value_before  TEXT,
   value_after   TEXT,
   submission_id BIGINT REFERENCES europanel.submissions(id) ON DELETE SET NULL,
-  occurred_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  occurred_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE europanel.submissions ADD COLUMN IF NOT EXISTS plant_id BIGINT
@@ -91,6 +96,35 @@ CREATE INDEX IF NOT EXISTS idx_ep_submission_pages_sub
   ON europanel.submission_pages(submission_id);
 CREATE INDEX IF NOT EXISTS idx_ep_audit_log_sub
   ON europanel.audit_log(submission_id);
+
+-- ─── Horodatage du noyau ──────────────────────────────────────────────
+-- Même trigger que les tables générées (voir triggerDdl) : réutilise
+-- europanel.set_updated_at(), défini dans 001_schema.sql, sans le
+-- redéfinir.
+DROP TRIGGER IF EXISTS trg_plants_updated_at ON europanel.plants;
+CREATE TRIGGER trg_plants_updated_at
+  BEFORE UPDATE ON europanel.plants
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_cycles_updated_at ON europanel.cycles;
+CREATE TRIGGER trg_cycles_updated_at
+  BEFORE UPDATE ON europanel.cycles
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_ref_lists_updated_at ON europanel.ref_lists;
+CREATE TRIGGER trg_ref_lists_updated_at
+  BEFORE UPDATE ON europanel.ref_lists
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_submission_pages_updated_at ON europanel.submission_pages;
+CREATE TRIGGER trg_submission_pages_updated_at
+  BEFORE UPDATE ON europanel.submission_pages
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_audit_log_updated_at ON europanel.audit_log;
+CREATE TRIGGER trg_audit_log_updated_at
+  BEFORE UPDATE ON europanel.audit_log
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 -- ─── RLS du noyau ─────────────────────────────────────────────────────
 ALTER TABLE europanel.plants            ENABLE ROW LEVEL SECURITY;
@@ -174,8 +208,14 @@ CREATE TABLE IF NOT EXISTS europanel.contacts (
   twg_ngo_name         TEXT,
   twg_ngo_job_title    TEXT,
   twg_ngo_email        TEXT,
-  twg_ngo_telephone    TEXT
+  twg_ngo_telephone    TEXT,
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DROP TRIGGER IF EXISTS trg_contacts_updated_at ON europanel.contacts;
+CREATE TRIGGER trg_contacts_updated_at
+  BEFORE UPDATE ON europanel.contacts
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.contacts TO authenticated;
 GRANT ALL ON europanel.contacts TO service_role;
@@ -199,8 +239,14 @@ CREATE TABLE IF NOT EXISTS europanel.general_info (
   location_country    TEXT,
   company             TEXT,
   ref_year            SMALLINT,
-  comments            TEXT
+  comments            TEXT,
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DROP TRIGGER IF EXISTS trg_general_info_updated_at ON europanel.general_info;
+CREATE TRIGGER trg_general_info_updated_at
+  BEFORE UPDATE ON europanel.general_info
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.general_info TO authenticated;
 GRANT ALL ON europanel.general_info TO service_role;
@@ -225,10 +271,16 @@ CREATE TABLE IF NOT EXISTS europanel.plant_products (
   qty            NUMERIC,
   unit           TEXT,
   daily          NUMERIC,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, idx)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_plant_products_submission_id
   ON europanel.plant_products(submission_id);
+
+DROP TRIGGER IF EXISTS trg_plant_products_updated_at ON europanel.plant_products;
+CREATE TRIGGER trg_plant_products_updated_at
+  BEFORE UPDATE ON europanel.plant_products
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.plant_products TO authenticated;
 GRANT ALL ON europanel.plant_products TO service_role;
@@ -252,11 +304,17 @@ CREATE TABLE IF NOT EXISTS europanel.site_activities (
   present        TEXT,
   ippc           TEXT,
   capacity       NUMERIC,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_site_activities_submission_id
   ON europanel.site_activities(submission_id);
+
+DROP TRIGGER IF EXISTS trg_site_activities_updated_at ON europanel.site_activities;
+CREATE TRIGGER trg_site_activities_updated_at
+  BEFORE UPDATE ON europanel.site_activities
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.site_activities TO authenticated;
 GRANT ALL ON europanel.site_activities TO service_role;
@@ -278,11 +336,17 @@ CREATE TABLE IF NOT EXISTS europanel.site_activity_units (
   code           TEXT NOT NULL,
   list_code      TEXT GENERATED ALWAYS AS ('site_activity_unit_codes') STORED,
   unit           TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_site_activity_units_submission_id
   ON europanel.site_activity_units(submission_id);
+
+DROP TRIGGER IF EXISTS trg_site_activity_units_updated_at ON europanel.site_activity_units;
+CREATE TRIGGER trg_site_activity_units_updated_at
+  BEFORE UPDATE ON europanel.site_activity_units
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.site_activity_units TO authenticated;
 GRANT ALL ON europanel.site_activity_units TO service_role;
@@ -300,8 +364,14 @@ CREATE POLICY "ep_site_activity_units_delete" ON europanel.site_activity_units
 -- ─── site_activity_other_specify — page 1, 1:1 avec la soumission ─────────────────
 CREATE TABLE IF NOT EXISTS europanel.site_activity_other_specify (
   submission_id            BIGINT PRIMARY KEY REFERENCES europanel.submissions(id) ON DELETE CASCADE,
-  act_other_specify_label  TEXT
+  act_other_specify_label  TEXT,
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DROP TRIGGER IF EXISTS trg_site_activity_other_specify_updated_at ON europanel.site_activity_other_specify;
+CREATE TRIGGER trg_site_activity_other_specify_updated_at
+  BEFORE UPDATE ON europanel.site_activity_other_specify
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.site_activity_other_specify TO authenticated;
 GRANT ALL ON europanel.site_activity_other_specify TO service_role;
@@ -340,8 +410,14 @@ CREATE TABLE IF NOT EXISTS europanel.plant_layout_section (
   s25_chan_air      NUMERIC,
   s25_chan_treated  TEXT,
   s25_dust_method   TEXT,
-  s25_comments      TEXT
+  s25_comments      TEXT,
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DROP TRIGGER IF EXISTS trg_plant_layout_section_updated_at ON europanel.plant_layout_section;
+CREATE TRIGGER trg_plant_layout_section_updated_at
+  BEFORE UPDATE ON europanel.plant_layout_section
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.plant_layout_section TO authenticated;
 GRANT ALL ON europanel.plant_layout_section TO service_role;
@@ -365,11 +441,17 @@ CREATE TABLE IF NOT EXISTS europanel.raw_material_storage (
   pct            NUMERIC,
   cap            NUMERIC,
   area           NUMERIC,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_raw_material_storage_submission_id
   ON europanel.raw_material_storage(submission_id);
+
+DROP TRIGGER IF EXISTS trg_raw_material_storage_updated_at ON europanel.raw_material_storage;
+CREATE TRIGGER trg_raw_material_storage_updated_at
+  BEFORE UPDATE ON europanel.raw_material_storage
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.raw_material_storage TO authenticated;
 GRANT ALL ON europanel.raw_material_storage TO service_role;
@@ -399,11 +481,17 @@ CREATE TABLE IF NOT EXISTS europanel.wood_prep_operations (
   emit_limit     TEXT,
   dust_method    TEXT,
   monitoring     TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_wood_prep_operations_submission_id
   ON europanel.wood_prep_operations(submission_id);
+
+DROP TRIGGER IF EXISTS trg_wood_prep_operations_updated_at ON europanel.wood_prep_operations;
+CREATE TRIGGER trg_wood_prep_operations_updated_at
+  BEFORE UPDATE ON europanel.wood_prep_operations
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.wood_prep_operations TO authenticated;
 GRANT ALL ON europanel.wood_prep_operations TO service_role;
@@ -425,11 +513,17 @@ CREATE TABLE IF NOT EXISTS europanel.wood_prep_param_comments (
   code           TEXT NOT NULL,
   list_code      TEXT GENERATED ALWAYS AS ('wood_prep_params') STORED,
   comments       TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_wood_prep_param_comments_submission_id
   ON europanel.wood_prep_param_comments(submission_id);
+
+DROP TRIGGER IF EXISTS trg_wood_prep_param_comments_updated_at ON europanel.wood_prep_param_comments;
+CREATE TRIGGER trg_wood_prep_param_comments_updated_at
+  BEFORE UPDATE ON europanel.wood_prep_param_comments
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.wood_prep_param_comments TO authenticated;
 GRANT ALL ON europanel.wood_prep_param_comments TO service_role;
@@ -448,8 +542,14 @@ CREATE POLICY "ep_wood_prep_param_comments_delete" ON europanel.wood_prep_param_
 CREATE TABLE IF NOT EXISTS europanel.raw_materials_section (
   submission_id  BIGINT PRIMARY KEY REFERENCES europanel.submissions(id) ON DELETE CASCADE,
   ref_year       SMALLINT,
-  s32_comments   TEXT
+  s32_comments   TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DROP TRIGGER IF EXISTS trg_raw_materials_section_updated_at ON europanel.raw_materials_section;
+CREATE TRIGGER trg_raw_materials_section_updated_at
+  BEFORE UPDATE ON europanel.raw_materials_section
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.raw_materials_section TO authenticated;
 GRANT ALL ON europanel.raw_materials_section TO service_role;
@@ -473,11 +573,17 @@ CREATE TABLE IF NOT EXISTS europanel.raw_materials (
   pct            NUMERIC,
   species        TEXT,
   source         TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_raw_materials_submission_id
   ON europanel.raw_materials(submission_id);
+
+DROP TRIGGER IF EXISTS trg_raw_materials_updated_at ON europanel.raw_materials;
+CREATE TRIGGER trg_raw_materials_updated_at
+  BEFORE UPDATE ON europanel.raw_materials
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.raw_materials TO authenticated;
 GRANT ALL ON europanel.raw_materials TO service_role;
@@ -499,11 +605,17 @@ CREATE TABLE IF NOT EXISTS europanel.raw_material_specify (
   code           TEXT NOT NULL,
   list_code      TEXT GENERATED ALWAYS AS ('raw_materials_specify') STORED,
   specify        TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_raw_material_specify_submission_id
   ON europanel.raw_material_specify(submission_id);
+
+DROP TRIGGER IF EXISTS trg_raw_material_specify_updated_at ON europanel.raw_material_specify;
+CREATE TRIGGER trg_raw_material_specify_updated_at
+  BEFORE UPDATE ON europanel.raw_material_specify
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.raw_material_specify TO authenticated;
 GRANT ALL ON europanel.raw_material_specify TO service_role;
@@ -526,10 +638,16 @@ CREATE TABLE IF NOT EXISTS europanel.resins (
   type           TEXT,
   pct            NUMERIC,
   comments       TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, idx)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_resins_submission_id
   ON europanel.resins(submission_id);
+
+DROP TRIGGER IF EXISTS trg_resins_updated_at ON europanel.resins;
+CREATE TRIGGER trg_resins_updated_at
+  BEFORE UPDATE ON europanel.resins
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.resins TO authenticated;
 GRANT ALL ON europanel.resins TO service_role;
@@ -551,10 +669,16 @@ CREATE TABLE IF NOT EXISTS europanel.hardeners (
   idx            SMALLINT NOT NULL,
   type           TEXT,
   comments       TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, idx)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_hardeners_submission_id
   ON europanel.hardeners(submission_id);
+
+DROP TRIGGER IF EXISTS trg_hardeners_updated_at ON europanel.hardeners;
+CREATE TRIGGER trg_hardeners_updated_at
+  BEFORE UPDATE ON europanel.hardeners
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.hardeners TO authenticated;
 GRANT ALL ON europanel.hardeners TO service_role;
@@ -577,11 +701,17 @@ CREATE TABLE IF NOT EXISTS europanel.additives (
   list_code      TEXT GENERATED ALWAYS AS ('additives') STORED,
   type           TEXT,
   comments       TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_additives_submission_id
   ON europanel.additives(submission_id);
+
+DROP TRIGGER IF EXISTS trg_additives_updated_at ON europanel.additives;
+CREATE TRIGGER trg_additives_updated_at
+  BEFORE UPDATE ON europanel.additives
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.additives TO authenticated;
 GRANT ALL ON europanel.additives TO service_role;
@@ -608,8 +738,14 @@ CREATE TABLE IF NOT EXISTS europanel.energy_section (
   s43_other             NUMERIC,
   s43_cold_startups     SMALLINT,
   s43_warm_startups     SMALLINT,
-  s43_maintenance_desc  TEXT
+  s43_maintenance_desc  TEXT,
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DROP TRIGGER IF EXISTS trg_energy_section_updated_at ON europanel.energy_section;
+CREATE TRIGGER trg_energy_section_updated_at
+  BEFORE UPDATE ON europanel.energy_section
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.energy_section TO authenticated;
 GRANT ALL ON europanel.energy_section TO service_role;
@@ -646,10 +782,16 @@ CREATE TABLE IF NOT EXISTS europanel.combustion_units (
   output_3         NUMERIC,
   output_4         NUMERIC,
   output_5         NUMERIC,
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, idx)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_combustion_units_submission_id
   ON europanel.combustion_units(submission_id);
+
+DROP TRIGGER IF EXISTS trg_combustion_units_updated_at ON europanel.combustion_units;
+CREATE TRIGGER trg_combustion_units_updated_at
+  BEFORE UPDATE ON europanel.combustion_units
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.combustion_units TO authenticated;
 GRANT ALL ON europanel.combustion_units TO service_role;
@@ -672,11 +814,17 @@ CREATE TABLE IF NOT EXISTS europanel.combustion_unit_fuels (
   list_code            TEXT GENERATED ALWAYS AS ('fuels') STORED,
   pct                  NUMERIC,
   description          TEXT,
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (combustion_units_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_combustion_unit_fuels_combustion_units_id
   ON europanel.combustion_unit_fuels(combustion_units_id);
+
+DROP TRIGGER IF EXISTS trg_combustion_unit_fuels_updated_at ON europanel.combustion_unit_fuels;
+CREATE TRIGGER trg_combustion_unit_fuels_updated_at
+  BEFORE UPDATE ON europanel.combustion_unit_fuels
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.combustion_unit_fuels TO authenticated;
 GRANT ALL ON europanel.combustion_unit_fuels TO service_role;
@@ -694,8 +842,14 @@ CREATE POLICY "ep_combustion_unit_fuels_delete" ON europanel.combustion_unit_fue
 -- ─── press_dryer_section — page 5, 1:1 avec la soumission ─────────────────────────
 CREATE TABLE IF NOT EXISTS europanel.press_dryer_section (
   submission_id  BIGINT PRIMARY KEY REFERENCES europanel.submissions(id) ON DELETE CASCADE,
-  comments       TEXT
+  comments       TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DROP TRIGGER IF EXISTS trg_press_dryer_section_updated_at ON europanel.press_dryer_section;
+CREATE TRIGGER trg_press_dryer_section_updated_at
+  BEFORE UPDATE ON europanel.press_dryer_section
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.press_dryer_section TO authenticated;
 GRANT ALL ON europanel.press_dryer_section TO service_role;
@@ -731,10 +885,16 @@ CREATE TABLE IF NOT EXISTS europanel.dryers (
   residence_unit  TEXT,
   recirculation   TEXT,
   heat_regained   TEXT,
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, idx)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_dryers_submission_id
   ON europanel.dryers(submission_id);
+
+DROP TRIGGER IF EXISTS trg_dryers_updated_at ON europanel.dryers;
+CREATE TRIGGER trg_dryers_updated_at
+  BEFORE UPDATE ON europanel.dryers
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.dryers TO authenticated;
 GRANT ALL ON europanel.dryers TO service_role;
@@ -765,10 +925,16 @@ CREATE TABLE IF NOT EXISTS europanel.presses (
   pressure           NUMERIC,
   exhaust_collected  TEXT,
   abatement          TEXT,
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, idx)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_presses_submission_id
   ON europanel.presses(submission_id);
+
+DROP TRIGGER IF EXISTS trg_presses_updated_at ON europanel.presses;
+CREATE TRIGGER trg_presses_updated_at
+  BEFORE UPDATE ON europanel.presses
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.presses TO authenticated;
 GRANT ALL ON europanel.presses TO service_role;
@@ -792,8 +958,14 @@ CREATE TABLE IF NOT EXISTS europanel.dust_section (
   s62_energy_recovery_pct  NUMERIC,
   s62_monitoring           TEXT,
   s62_control_measures     TEXT,
-  s62_comments             TEXT
+  s62_comments             TEXT,
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DROP TRIGGER IF EXISTS trg_dust_section_updated_at ON europanel.dust_section;
+CREATE TRIGGER trg_dust_section_updated_at
+  BEFORE UPDATE ON europanel.dust_section
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.dust_section TO authenticated;
 GRANT ALL ON europanel.dust_section TO service_role;
@@ -819,10 +991,16 @@ CREATE TABLE IF NOT EXISTS europanel.abatement_techniques (
   design_features     TEXT,
   removal_efficiency  TEXT,
   comments            TEXT,
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, idx)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_abatement_techniques_submission_id
   ON europanel.abatement_techniques(submission_id);
+
+DROP TRIGGER IF EXISTS trg_abatement_techniques_updated_at ON europanel.abatement_techniques;
+CREATE TRIGGER trg_abatement_techniques_updated_at
+  BEFORE UPDATE ON europanel.abatement_techniques
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.abatement_techniques TO authenticated;
 GRANT ALL ON europanel.abatement_techniques TO service_role;
@@ -845,11 +1023,17 @@ CREATE TABLE IF NOT EXISTS europanel.abatement_technique_sources (
   list_code                TEXT GENERATED ALWAYS AS ('waste_gas_sources') STORED,
   yn                       TEXT,
   spec                     TEXT,
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (abatement_techniques_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_abatement_technique_sources_abatement_techniques_id
   ON europanel.abatement_technique_sources(abatement_techniques_id);
+
+DROP TRIGGER IF EXISTS trg_abatement_technique_sources_updated_at ON europanel.abatement_technique_sources;
+CREATE TRIGGER trg_abatement_technique_sources_updated_at
+  BEFORE UPDATE ON europanel.abatement_technique_sources
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.abatement_technique_sources TO authenticated;
 GRANT ALL ON europanel.abatement_technique_sources TO service_role;
@@ -872,11 +1056,17 @@ CREATE TABLE IF NOT EXISTS europanel.abatement_technique_flows (
   list_code                TEXT GENERATED ALWAYS AS ('abatement_flows') STORED,
   val                      NUMERIC,
   comment                  TEXT,
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (abatement_techniques_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_abatement_technique_flows_abatement_techniques_id
   ON europanel.abatement_technique_flows(abatement_techniques_id);
+
+DROP TRIGGER IF EXISTS trg_abatement_technique_flows_updated_at ON europanel.abatement_technique_flows;
+CREATE TRIGGER trg_abatement_technique_flows_updated_at
+  BEFORE UPDATE ON europanel.abatement_technique_flows
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.abatement_technique_flows TO authenticated;
 GRANT ALL ON europanel.abatement_technique_flows TO service_role;
@@ -913,10 +1103,16 @@ CREATE TABLE IF NOT EXISTS europanel.emission_points (
   density_std     NUMERIC,
   flow_actual     NUMERIC,
   flow_std        NUMERIC,
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, idx)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_emission_points_submission_id
   ON europanel.emission_points(submission_id);
+
+DROP TRIGGER IF EXISTS trg_emission_points_updated_at ON europanel.emission_points;
+CREATE TRIGGER trg_emission_points_updated_at
+  BEFORE UPDATE ON europanel.emission_points
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.emission_points TO authenticated;
 GRANT ALL ON europanel.emission_points TO service_role;
@@ -943,11 +1139,17 @@ CREATE TABLE IF NOT EXISTS europanel.emission_point_pollutants (
   short_term          TEXT,
   short_val           NUMERIC,
   limit_val           TEXT,
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (emission_points_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_emission_point_pollutants_emission_points_id
   ON europanel.emission_point_pollutants(emission_points_id);
+
+DROP TRIGGER IF EXISTS trg_emission_point_pollutants_updated_at ON europanel.emission_point_pollutants;
+CREATE TRIGGER trg_emission_point_pollutants_updated_at
+  BEFORE UPDATE ON europanel.emission_point_pollutants
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.emission_point_pollutants TO authenticated;
 GRANT ALL ON europanel.emission_point_pollutants TO service_role;
@@ -972,10 +1174,16 @@ CREATE TABLE IF NOT EXISTS europanel.waste_water_discharges (
   treated        TEXT,
   wwtp_desc      TEXT,
   sludge_fate    TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, idx)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_waste_water_discharges_submission_id
   ON europanel.waste_water_discharges(submission_id);
+
+DROP TRIGGER IF EXISTS trg_waste_water_discharges_updated_at ON europanel.waste_water_discharges;
+CREATE TRIGGER trg_waste_water_discharges_updated_at
+  BEFORE UPDATE ON europanel.waste_water_discharges
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.waste_water_discharges TO authenticated;
 GRANT ALL ON europanel.waste_water_discharges TO service_role;
@@ -1000,11 +1208,17 @@ CREATE TABLE IF NOT EXISTS europanel.waste_water_pollutants (
   freq                       TEXT,
   pos                        TEXT,
   comments                   TEXT,
+  updated_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (waste_water_discharges_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_waste_water_pollutants_waste_water_discharges_id
   ON europanel.waste_water_pollutants(waste_water_discharges_id);
+
+DROP TRIGGER IF EXISTS trg_waste_water_pollutants_updated_at ON europanel.waste_water_pollutants;
+CREATE TRIGGER trg_waste_water_pollutants_updated_at
+  BEFORE UPDATE ON europanel.waste_water_pollutants
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.waste_water_pollutants TO authenticated;
 GRANT ALL ON europanel.waste_water_pollutants TO service_role;
@@ -1027,11 +1241,17 @@ CREATE TABLE IF NOT EXISTS europanel.waste_water_sources (
   list_code                  TEXT GENERATED ALWAYS AS ('ww_sources') STORED,
   vol                        NUMERIC,
   comment                    TEXT,
+  updated_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (waste_water_discharges_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_waste_water_sources_waste_water_discharges_id
   ON europanel.waste_water_sources(waste_water_discharges_id);
+
+DROP TRIGGER IF EXISTS trg_waste_water_sources_updated_at ON europanel.waste_water_sources;
+CREATE TRIGGER trg_waste_water_sources_updated_at
+  BEFORE UPDATE ON europanel.waste_water_sources
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.waste_water_sources TO authenticated;
 GRANT ALL ON europanel.waste_water_sources TO service_role;
@@ -1050,8 +1270,14 @@ CREATE POLICY "ep_waste_water_sources_delete" ON europanel.waste_water_sources
 CREATE TABLE IF NOT EXISTS europanel.waste_section (
   submission_id         BIGINT PRIMARY KEY REFERENCES europanel.submissions(id) ON DELETE CASCADE,
   waste_comments        TEXT,
-  waste_bat_techniques  TEXT
+  waste_bat_techniques  TEXT,
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DROP TRIGGER IF EXISTS trg_waste_section_updated_at ON europanel.waste_section;
+CREATE TRIGGER trg_waste_section_updated_at
+  BEFORE UPDATE ON europanel.waste_section
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.waste_section TO authenticated;
 GRANT ALL ON europanel.waste_section TO service_role;
@@ -1076,10 +1302,16 @@ CREATE TABLE IF NOT EXISTS europanel.waste_streams (
   source         TEXT,
   qty            NUMERIC,
   dest           TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (submission_id, idx)
 );
 CREATE INDEX IF NOT EXISTS idx_ep_waste_streams_submission_id
   ON europanel.waste_streams(submission_id);
+
+DROP TRIGGER IF EXISTS trg_waste_streams_updated_at ON europanel.waste_streams;
+CREATE TRIGGER trg_waste_streams_updated_at
+  BEFORE UPDATE ON europanel.waste_streams
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.waste_streams TO authenticated;
 GRANT ALL ON europanel.waste_streams TO service_role;
@@ -1106,8 +1338,14 @@ CREATE TABLE IF NOT EXISTS europanel.water_consumption (
   wc_refining_recycled  NUMERIC,
   wc_recycling_savings  NUMERIC,
   wc_bat_techniques     TEXT,
-  wc_comments           TEXT
+  wc_comments           TEXT,
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DROP TRIGGER IF EXISTS trg_water_consumption_updated_at ON europanel.water_consumption;
+CREATE TRIGGER trg_water_consumption_updated_at
+  BEFORE UPDATE ON europanel.water_consumption
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.water_consumption TO authenticated;
 GRANT ALL ON europanel.water_consumption TO service_role;
@@ -1150,8 +1388,14 @@ CREATE TABLE IF NOT EXISTS europanel.bat_candidate (
   bat_cost_effectiveness   TEXT,
   bat_reference_plants     TEXT,
   bat_references           TEXT,
-  bat_tech_comments        TEXT
+  bat_tech_comments        TEXT,
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DROP TRIGGER IF EXISTS trg_bat_candidate_updated_at ON europanel.bat_candidate;
+CREATE TRIGGER trg_bat_candidate_updated_at
+  BEFORE UPDATE ON europanel.bat_candidate
+  FOR EACH ROW EXECUTE FUNCTION europanel.set_updated_at();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.bat_candidate TO authenticated;
 GRANT ALL ON europanel.bat_candidate TO service_role;

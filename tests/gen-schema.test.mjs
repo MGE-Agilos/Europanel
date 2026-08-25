@@ -145,7 +145,7 @@ test('une colonne aliasée est émise sous son nom de colonne, pas sous son segm
   // `ep_1_id` alias vers la colonne `point_ref` : la colonne `id` qui subsiste
   // dans emission_points est bien la clé primaire de substitution, structurelle,
   // et c'est précisément la collision que l'alias existe pour éviter.
-  const STRUCTURAL = new Set(['id', 'submission_id', 'idx', 'code', 'list_code']);
+  const STRUCTURAL = new Set(['id', 'submission_id', 'idx', 'code', 'list_code', 'updated_at']);
   for (const [table, e] of Object.entries(SCHEMA)) {
     const structural = new Set(STRUCTURAL);
     if (e.parent) structural.add(`${e.parent}_id`);
@@ -218,6 +218,25 @@ test('le prédicat RLS remonte jusqu\'à submissions.user_id', () => {
         `${table}/${op}: le prédicat ne remonte pas à submissions.user_id`);
     }
   }
+});
+
+test('chaque table porte updated_at et un trigger BEFORE UPDATE réutilisant set_updated_at()', () => {
+  const core = ['plants', 'cycles', 'ref_lists', 'submission_pages', 'audit_log'];
+  for (const table of [...Object.keys(SCHEMA), ...core]) {
+    assert.match(tableBody(table), /\n  updated_at\s+TIMESTAMPTZ NOT NULL DEFAULT NOW\(\)/,
+      `${table}: updated_at manquante`);
+    assert.ok(sql.includes(`DROP TRIGGER IF EXISTS trg_${table}_updated_at ON europanel.${table};`),
+      `${table}: DROP TRIGGER manquant`);
+    assert.match(sql,
+      new RegExp(`CREATE TRIGGER trg_${table}_updated_at\\s+BEFORE UPDATE ON europanel\\.${table}\\s+FOR EACH ROW EXECUTE FUNCTION europanel\\.set_updated_at\\(\\);`),
+      `${table}: trigger updated_at manquant ou mal formé`);
+  }
+  // set_updated_at() n'est jamais redéfinie ici : 001_schema.sql la définit une
+  // fois, et 002 est documenté comme dépendant de 001 (voir l'en-tête du DDL).
+  assert.ok(!sql.includes('CREATE OR REPLACE FUNCTION europanel.set_updated_at'),
+    '002 ne doit pas redéfinir set_updated_at()');
+  const totalTriggers = (sql.match(/EXECUTE FUNCTION europanel\.set_updated_at\(\);/g) || []).length;
+  assert.strictEqual(totalTriggers, Object.keys(SCHEMA).length + core.length);
 });
 
 test('chaque table créée porte au moins un GRANT, et les séquences sont accordées une fois', () => {
