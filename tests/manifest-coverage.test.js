@@ -154,6 +154,21 @@ test('toute entree a parent reference une table existante', () => {
   }
 });
 
+// parentCol doit etre declare explicitement sur chaque entree imbriquee,
+// jamais derive du nom de la table parente : deriver imposerait de deviner
+// un singulier anglais (emission_points -> emission_point), ce qui marche
+// pour cette table et ne generalise pas a la suivante. Ce test garantit que
+// docs/db.js#parentColumn ne retombe jamais sur ce fallback en silence pour
+// une entree existante.
+test('toute entree a parent declare aussi parentCol, au singulier explicite', () => {
+  for (const [name, e] of Object.entries(SCHEMA)) {
+    if (!e.parent) continue;
+    assert.ok(typeof e.parentCol === 'string' && e.parentCol.length > 0,
+      `${name}: parentCol non declare (parent « ${e.parent} »)`);
+    assert.ok(e.parentCol.endsWith('_id'), `${name}: parentCol « ${e.parentCol} » doit finir par _id`);
+  }
+});
+
 test('toute page declaree existe reellement', () => {
   // Le questionnaire compte 13 pages, 0 a 12. La page 12 est un recapitulatif
   // sans champ. Sans cette borne, une page mal tapee passerait inapercue et

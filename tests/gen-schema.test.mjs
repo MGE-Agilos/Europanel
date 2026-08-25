@@ -8,6 +8,13 @@ import { buildDdl } from '../tools/gen_schema.mjs';
 
 const require = createRequire(import.meta.url);
 const { SCHEMA, LISTS } = require('../docs/fields.js');
+const { parentColumn } = require('../docs/db.js');
+
+// Colonne de rattachement d'une entree, y compris a la racine (submission_id) :
+// docs/db.js#parentColumn ne repond que pour le cas « a un parent ».
+function rattachCol(e) {
+  return e.parent ? parentColumn(e) : 'submission_id';
+}
 
 const sql = buildDdl();
 
@@ -44,7 +51,7 @@ test('les sections répétables ont idx et une contrainte d\'unicité', () => {
   for (const [table, e] of Object.entries(SCHEMA)) {
     if (e.kind !== 'many') continue;
     const body = tableBody(table);
-    const parentCol = e.parent ? `${e.parent}_id` : 'submission_id';
+    const parentCol = rattachCol(e);
     assert.match(body, /idx\s+SMALLINT NOT NULL/, `${table}: idx manquant`);
     assert.ok(body.includes(`UNIQUE (${parentCol}, idx)`), `${table}: unicité manquante`);
   }
@@ -54,7 +61,7 @@ test('les groupes à clés ont code, une unicité et la FK composite vers ref_li
   for (const [table, e] of Object.entries(SCHEMA)) {
     if (e.kind !== 'keyed') continue;
     const body = tableBody(table);
-    const parentCol = e.parent ? `${e.parent}_id` : 'submission_id';
+    const parentCol = rattachCol(e);
     assert.match(body, /code\s+TEXT NOT NULL/, `${table}: code manquant`);
     assert.ok(body.includes(`UNIQUE (${parentCol}, code)`), `${table}: unicité manquante`);
     assert.ok(body.includes(`list_code`), `${table}: list_code manquante`);
@@ -157,7 +164,7 @@ test('une colonne aliasée est émise sous son nom de colonne, pas sous son segm
   const STRUCTURAL = new Set(['id', 'submission_id', 'idx', 'code', 'list_code', 'updated_at']);
   for (const [table, e] of Object.entries(SCHEMA)) {
     const structural = new Set(STRUCTURAL);
-    if (e.parent) structural.add(`${e.parent}_id`);
+    if (e.parent) structural.add(parentColumn(e));
     const emitted = columnNamesOf(table).filter(n => !structural.has(n));
     assert.deepStrictEqual(emitted, Object.keys(e.cols),
       `${table}: colonnes émises différentes des colonnes du manifeste`);
@@ -169,10 +176,9 @@ test('les tables enfants référencent leur parent en CASCADE', () => {
     /emission_point_pollutants[\s\S]*?REFERENCES europanel\.emission_points\(id\) ON DELETE CASCADE/);
   for (const [table, e] of Object.entries(SCHEMA)) {
     if (!e.parent) continue;
+    const col = parentColumn(e);
     assert.ok(
-      tableBody(table).includes(
-        `${e.parent}_id  BIGINT NOT NULL REFERENCES europanel.${e.parent}(id) ON DELETE CASCADE`) ||
-      new RegExp(`${e.parent}_id\\s+BIGINT NOT NULL REFERENCES europanel\\.${e.parent}\\(id\\) ON DELETE CASCADE`)
+      new RegExp(`${col}\\s+BIGINT NOT NULL REFERENCES europanel\\.${e.parent}\\(id\\) ON DELETE CASCADE`)
         .test(tableBody(table)),
       `${table}: FK parent manquante ou sans CASCADE`);
   }
@@ -181,7 +187,7 @@ test('les tables enfants référencent leur parent en CASCADE', () => {
 test('toute table porte un index sur sa colonne de rattachement', () => {
   for (const [table, e] of Object.entries(SCHEMA)) {
     if (e.kind === 'one') continue;   // submission_id y est la clé primaire
-    const col = e.parent ? `${e.parent}_id` : 'submission_id';
+    const col = rattachCol(e);
     assert.ok(sql.includes(`ON europanel.${table}(${col});`), `${table}: index manquant`);
   }
 });
@@ -219,7 +225,7 @@ test('le prédicat RLS remonte jusqu\'à submissions.user_id', () => {
   assert.ok(policyBody('dryers', 'SELECT').includes(root));
   // Enfant imbriqué : filtre sur le parent, lui-même filtré.
   assert.ok(policyBody('emission_point_pollutants', 'SELECT').includes(
-    `emission_points_id IN (SELECT id FROM europanel.emission_points WHERE ${root})`));
+    `emission_point_id IN (SELECT id FROM europanel.emission_points WHERE ${root})`));
   // Aucune politique ne doit s'arrêter avant user_id.
   for (const table of Object.keys(SCHEMA)) {
     for (const op of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {

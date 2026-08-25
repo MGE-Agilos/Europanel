@@ -52,6 +52,16 @@
     return String(value);
   }
 
+  /* ── Parenté ──────────────────────────────────────────────────────── */
+
+  // Colonne portant la cle etrangere vers le parent. Declaree explicitement
+  // dans le manifeste plutot que derivee du nom de table : deriver imposerait
+  // de deviner un singulier anglais, ce qui marche pour emission_points et
+  // pas pour la table suivante.
+  function parentColumn(entry) {
+    return entry.parentCol || (entry.parent ? entry.parent + '_id' : null);
+  }
+
   /* ── Construction des noms ────────────────────────────────────────── */
 
   // Construit le nom de champ HTML attendu à partir d'un motif du manifeste.
@@ -276,5 +286,7 @@
     return flat;
   }
 
-  return { toDb, fromDb, buildName, fieldSegment, countInstances, dispatch, hydrate, SCHEMA };
+  return {
+    toDb, fromDb, buildName, fieldSegment, parentColumn, countInstances, dispatch, hydrate, SCHEMA,
+  };
 });

@@ -808,18 +808,18 @@ CREATE POLICY "ep_combustion_units_delete" ON europanel.combustion_units
 
 -- ─── combustion_unit_fuels — page 4, groupe à clés (code, liste « fuels »), enfant de combustion_units ───
 CREATE TABLE IF NOT EXISTS europanel.combustion_unit_fuels (
-  id                   BIGSERIAL PRIMARY KEY,
-  combustion_units_id  BIGINT NOT NULL REFERENCES europanel.combustion_units(id) ON DELETE CASCADE,
-  code                 TEXT NOT NULL,
-  list_code            TEXT NOT NULL DEFAULT 'fuels' CHECK (list_code = 'fuels'),
-  pct                  NUMERIC,
-  description          TEXT,
-  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (combustion_units_id, code),
+  id                  BIGSERIAL PRIMARY KEY,
+  combustion_unit_id  BIGINT NOT NULL REFERENCES europanel.combustion_units(id) ON DELETE CASCADE,
+  code                TEXT NOT NULL,
+  list_code           TEXT NOT NULL DEFAULT 'fuels' CHECK (list_code = 'fuels'),
+  pct                 NUMERIC,
+  description         TEXT,
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (combustion_unit_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
-CREATE INDEX IF NOT EXISTS idx_ep_combustion_unit_fuels_combustion_units_id
-  ON europanel.combustion_unit_fuels(combustion_units_id);
+CREATE INDEX IF NOT EXISTS idx_ep_combustion_unit_fuels_combustion_unit_id
+  ON europanel.combustion_unit_fuels(combustion_unit_id);
 
 DROP TRIGGER IF EXISTS trg_combustion_unit_fuels_updated_at ON europanel.combustion_unit_fuels;
 CREATE TRIGGER trg_combustion_unit_fuels_updated_at
@@ -831,13 +831,13 @@ GRANT ALL ON europanel.combustion_unit_fuels TO service_role;
 
 ALTER TABLE europanel.combustion_unit_fuels ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_combustion_unit_fuels_select" ON europanel.combustion_unit_fuels
-  FOR SELECT TO authenticated USING (combustion_units_id IN (SELECT id FROM europanel.combustion_units WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR SELECT TO authenticated USING (combustion_unit_id IN (SELECT id FROM europanel.combustion_units WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_combustion_unit_fuels_insert" ON europanel.combustion_unit_fuels
-  FOR INSERT TO authenticated WITH CHECK (combustion_units_id IN (SELECT id FROM europanel.combustion_units WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR INSERT TO authenticated WITH CHECK (combustion_unit_id IN (SELECT id FROM europanel.combustion_units WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_combustion_unit_fuels_update" ON europanel.combustion_unit_fuels
-  FOR UPDATE TO authenticated USING (combustion_units_id IN (SELECT id FROM europanel.combustion_units WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR UPDATE TO authenticated USING (combustion_unit_id IN (SELECT id FROM europanel.combustion_units WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_combustion_unit_fuels_delete" ON europanel.combustion_unit_fuels
-  FOR DELETE TO authenticated USING (combustion_units_id IN (SELECT id FROM europanel.combustion_units WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR DELETE TO authenticated USING (combustion_unit_id IN (SELECT id FROM europanel.combustion_units WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 
 -- ─── press_dryer_section — page 5, 1:1 avec la soumission ─────────────────────────
 CREATE TABLE IF NOT EXISTS europanel.press_dryer_section (
@@ -1017,18 +1017,18 @@ CREATE POLICY "ep_abatement_techniques_delete" ON europanel.abatement_techniques
 
 -- ─── abatement_technique_sources — page 6, groupe à clés (code, liste « waste_gas_sources »), enfant de abatement_techniques ───
 CREATE TABLE IF NOT EXISTS europanel.abatement_technique_sources (
-  id                       BIGSERIAL PRIMARY KEY,
-  abatement_techniques_id  BIGINT NOT NULL REFERENCES europanel.abatement_techniques(id) ON DELETE CASCADE,
-  code                     TEXT NOT NULL,
-  list_code                TEXT NOT NULL DEFAULT 'waste_gas_sources' CHECK (list_code = 'waste_gas_sources'),
-  yn                       TEXT,
-  spec                     TEXT,
-  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (abatement_techniques_id, code),
+  id                      BIGSERIAL PRIMARY KEY,
+  abatement_technique_id  BIGINT NOT NULL REFERENCES europanel.abatement_techniques(id) ON DELETE CASCADE,
+  code                    TEXT NOT NULL,
+  list_code               TEXT NOT NULL DEFAULT 'waste_gas_sources' CHECK (list_code = 'waste_gas_sources'),
+  yn                      TEXT,
+  spec                    TEXT,
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (abatement_technique_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
-CREATE INDEX IF NOT EXISTS idx_ep_abatement_technique_sources_abatement_techniques_id
-  ON europanel.abatement_technique_sources(abatement_techniques_id);
+CREATE INDEX IF NOT EXISTS idx_ep_abatement_technique_sources_abatement_technique_id
+  ON europanel.abatement_technique_sources(abatement_technique_id);
 
 DROP TRIGGER IF EXISTS trg_abatement_technique_sources_updated_at ON europanel.abatement_technique_sources;
 CREATE TRIGGER trg_abatement_technique_sources_updated_at
@@ -1040,28 +1040,28 @@ GRANT ALL ON europanel.abatement_technique_sources TO service_role;
 
 ALTER TABLE europanel.abatement_technique_sources ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_abatement_technique_sources_select" ON europanel.abatement_technique_sources
-  FOR SELECT TO authenticated USING (abatement_techniques_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR SELECT TO authenticated USING (abatement_technique_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_abatement_technique_sources_insert" ON europanel.abatement_technique_sources
-  FOR INSERT TO authenticated WITH CHECK (abatement_techniques_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR INSERT TO authenticated WITH CHECK (abatement_technique_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_abatement_technique_sources_update" ON europanel.abatement_technique_sources
-  FOR UPDATE TO authenticated USING (abatement_techniques_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR UPDATE TO authenticated USING (abatement_technique_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_abatement_technique_sources_delete" ON europanel.abatement_technique_sources
-  FOR DELETE TO authenticated USING (abatement_techniques_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR DELETE TO authenticated USING (abatement_technique_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 
 -- ─── abatement_technique_flows — page 6, groupe à clés (code, liste « abatement_flows »), enfant de abatement_techniques ───
 CREATE TABLE IF NOT EXISTS europanel.abatement_technique_flows (
-  id                       BIGSERIAL PRIMARY KEY,
-  abatement_techniques_id  BIGINT NOT NULL REFERENCES europanel.abatement_techniques(id) ON DELETE CASCADE,
-  code                     TEXT NOT NULL,
-  list_code                TEXT NOT NULL DEFAULT 'abatement_flows' CHECK (list_code = 'abatement_flows'),
-  val                      NUMERIC,
-  comment                  TEXT,
-  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (abatement_techniques_id, code),
+  id                      BIGSERIAL PRIMARY KEY,
+  abatement_technique_id  BIGINT NOT NULL REFERENCES europanel.abatement_techniques(id) ON DELETE CASCADE,
+  code                    TEXT NOT NULL,
+  list_code               TEXT NOT NULL DEFAULT 'abatement_flows' CHECK (list_code = 'abatement_flows'),
+  val                     NUMERIC,
+  comment                 TEXT,
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (abatement_technique_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
-CREATE INDEX IF NOT EXISTS idx_ep_abatement_technique_flows_abatement_techniques_id
-  ON europanel.abatement_technique_flows(abatement_techniques_id);
+CREATE INDEX IF NOT EXISTS idx_ep_abatement_technique_flows_abatement_technique_id
+  ON europanel.abatement_technique_flows(abatement_technique_id);
 
 DROP TRIGGER IF EXISTS trg_abatement_technique_flows_updated_at ON europanel.abatement_technique_flows;
 CREATE TRIGGER trg_abatement_technique_flows_updated_at
@@ -1073,13 +1073,13 @@ GRANT ALL ON europanel.abatement_technique_flows TO service_role;
 
 ALTER TABLE europanel.abatement_technique_flows ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_abatement_technique_flows_select" ON europanel.abatement_technique_flows
-  FOR SELECT TO authenticated USING (abatement_techniques_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR SELECT TO authenticated USING (abatement_technique_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_abatement_technique_flows_insert" ON europanel.abatement_technique_flows
-  FOR INSERT TO authenticated WITH CHECK (abatement_techniques_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR INSERT TO authenticated WITH CHECK (abatement_technique_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_abatement_technique_flows_update" ON europanel.abatement_technique_flows
-  FOR UPDATE TO authenticated USING (abatement_techniques_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR UPDATE TO authenticated USING (abatement_technique_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_abatement_technique_flows_delete" ON europanel.abatement_technique_flows
-  FOR DELETE TO authenticated USING (abatement_techniques_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR DELETE TO authenticated USING (abatement_technique_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 
 -- ─── emission_points — page 7, section répétable (idx) ────────────────────────────
 CREATE TABLE IF NOT EXISTS europanel.emission_points (
@@ -1129,22 +1129,22 @@ CREATE POLICY "ep_emission_points_delete" ON europanel.emission_points
 
 -- ─── emission_point_pollutants — page 7, groupe à clés (code, liste « pollutants »), enfant de emission_points ───
 CREATE TABLE IF NOT EXISTS europanel.emission_point_pollutants (
-  id                  BIGSERIAL PRIMARY KEY,
-  emission_points_id  BIGINT NOT NULL REFERENCES europanel.emission_points(id) ON DELETE CASCADE,
-  code                TEXT NOT NULL,
-  list_code           TEXT NOT NULL DEFAULT 'pollutants' CHECK (list_code = 'pollutants'),
-  conc                NUMERIC,
-  method              TEXT,
-  t_year              NUMERIC,
-  short_term          TEXT,
-  short_val           NUMERIC,
-  limit_val           TEXT,
-  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (emission_points_id, code),
+  id                 BIGSERIAL PRIMARY KEY,
+  emission_point_id  BIGINT NOT NULL REFERENCES europanel.emission_points(id) ON DELETE CASCADE,
+  code               TEXT NOT NULL,
+  list_code          TEXT NOT NULL DEFAULT 'pollutants' CHECK (list_code = 'pollutants'),
+  conc               NUMERIC,
+  method             TEXT,
+  t_year             NUMERIC,
+  short_term         TEXT,
+  short_val          NUMERIC,
+  limit_val          TEXT,
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (emission_point_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
-CREATE INDEX IF NOT EXISTS idx_ep_emission_point_pollutants_emission_points_id
-  ON europanel.emission_point_pollutants(emission_points_id);
+CREATE INDEX IF NOT EXISTS idx_ep_emission_point_pollutants_emission_point_id
+  ON europanel.emission_point_pollutants(emission_point_id);
 
 DROP TRIGGER IF EXISTS trg_emission_point_pollutants_updated_at ON europanel.emission_point_pollutants;
 CREATE TRIGGER trg_emission_point_pollutants_updated_at
@@ -1156,13 +1156,13 @@ GRANT ALL ON europanel.emission_point_pollutants TO service_role;
 
 ALTER TABLE europanel.emission_point_pollutants ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_emission_point_pollutants_select" ON europanel.emission_point_pollutants
-  FOR SELECT TO authenticated USING (emission_points_id IN (SELECT id FROM europanel.emission_points WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR SELECT TO authenticated USING (emission_point_id IN (SELECT id FROM europanel.emission_points WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_emission_point_pollutants_insert" ON europanel.emission_point_pollutants
-  FOR INSERT TO authenticated WITH CHECK (emission_points_id IN (SELECT id FROM europanel.emission_points WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR INSERT TO authenticated WITH CHECK (emission_point_id IN (SELECT id FROM europanel.emission_points WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_emission_point_pollutants_update" ON europanel.emission_point_pollutants
-  FOR UPDATE TO authenticated USING (emission_points_id IN (SELECT id FROM europanel.emission_points WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR UPDATE TO authenticated USING (emission_point_id IN (SELECT id FROM europanel.emission_points WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_emission_point_pollutants_delete" ON europanel.emission_point_pollutants
-  FOR DELETE TO authenticated USING (emission_points_id IN (SELECT id FROM europanel.emission_points WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR DELETE TO authenticated USING (emission_point_id IN (SELECT id FROM europanel.emission_points WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 
 -- ─── waste_water_discharges — page 8, section répétable (idx) ─────────────────────
 CREATE TABLE IF NOT EXISTS europanel.waste_water_discharges (
@@ -1200,20 +1200,20 @@ CREATE POLICY "ep_waste_water_discharges_delete" ON europanel.waste_water_discha
 
 -- ─── waste_water_pollutants — page 8, groupe à clés (code, liste « ww_pollutants »), enfant de waste_water_discharges ───
 CREATE TABLE IF NOT EXISTS europanel.waste_water_pollutants (
-  id                         BIGSERIAL PRIMARY KEY,
-  waste_water_discharges_id  BIGINT NOT NULL REFERENCES europanel.waste_water_discharges(id) ON DELETE CASCADE,
-  code                       TEXT NOT NULL,
-  list_code                  TEXT NOT NULL DEFAULT 'ww_pollutants' CHECK (list_code = 'ww_pollutants'),
-  conc                       NUMERIC,
-  freq                       TEXT,
-  pos                        TEXT,
-  comments                   TEXT,
-  updated_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (waste_water_discharges_id, code),
+  id                        BIGSERIAL PRIMARY KEY,
+  waste_water_discharge_id  BIGINT NOT NULL REFERENCES europanel.waste_water_discharges(id) ON DELETE CASCADE,
+  code                      TEXT NOT NULL,
+  list_code                 TEXT NOT NULL DEFAULT 'ww_pollutants' CHECK (list_code = 'ww_pollutants'),
+  conc                      NUMERIC,
+  freq                      TEXT,
+  pos                       TEXT,
+  comments                  TEXT,
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (waste_water_discharge_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
-CREATE INDEX IF NOT EXISTS idx_ep_waste_water_pollutants_waste_water_discharges_id
-  ON europanel.waste_water_pollutants(waste_water_discharges_id);
+CREATE INDEX IF NOT EXISTS idx_ep_waste_water_pollutants_waste_water_discharge_id
+  ON europanel.waste_water_pollutants(waste_water_discharge_id);
 
 DROP TRIGGER IF EXISTS trg_waste_water_pollutants_updated_at ON europanel.waste_water_pollutants;
 CREATE TRIGGER trg_waste_water_pollutants_updated_at
@@ -1225,28 +1225,28 @@ GRANT ALL ON europanel.waste_water_pollutants TO service_role;
 
 ALTER TABLE europanel.waste_water_pollutants ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_waste_water_pollutants_select" ON europanel.waste_water_pollutants
-  FOR SELECT TO authenticated USING (waste_water_discharges_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR SELECT TO authenticated USING (waste_water_discharge_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_waste_water_pollutants_insert" ON europanel.waste_water_pollutants
-  FOR INSERT TO authenticated WITH CHECK (waste_water_discharges_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR INSERT TO authenticated WITH CHECK (waste_water_discharge_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_waste_water_pollutants_update" ON europanel.waste_water_pollutants
-  FOR UPDATE TO authenticated USING (waste_water_discharges_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR UPDATE TO authenticated USING (waste_water_discharge_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_waste_water_pollutants_delete" ON europanel.waste_water_pollutants
-  FOR DELETE TO authenticated USING (waste_water_discharges_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR DELETE TO authenticated USING (waste_water_discharge_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 
 -- ─── waste_water_sources — page 8, groupe à clés (code, liste « ww_sources »), enfant de waste_water_discharges ───
 CREATE TABLE IF NOT EXISTS europanel.waste_water_sources (
-  id                         BIGSERIAL PRIMARY KEY,
-  waste_water_discharges_id  BIGINT NOT NULL REFERENCES europanel.waste_water_discharges(id) ON DELETE CASCADE,
-  code                       TEXT NOT NULL,
-  list_code                  TEXT NOT NULL DEFAULT 'ww_sources' CHECK (list_code = 'ww_sources'),
-  vol                        NUMERIC,
-  comment                    TEXT,
-  updated_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (waste_water_discharges_id, code),
+  id                        BIGSERIAL PRIMARY KEY,
+  waste_water_discharge_id  BIGINT NOT NULL REFERENCES europanel.waste_water_discharges(id) ON DELETE CASCADE,
+  code                      TEXT NOT NULL,
+  list_code                 TEXT NOT NULL DEFAULT 'ww_sources' CHECK (list_code = 'ww_sources'),
+  vol                       NUMERIC,
+  comment                   TEXT,
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (waste_water_discharge_id, code),
   FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 );
-CREATE INDEX IF NOT EXISTS idx_ep_waste_water_sources_waste_water_discharges_id
-  ON europanel.waste_water_sources(waste_water_discharges_id);
+CREATE INDEX IF NOT EXISTS idx_ep_waste_water_sources_waste_water_discharge_id
+  ON europanel.waste_water_sources(waste_water_discharge_id);
 
 DROP TRIGGER IF EXISTS trg_waste_water_sources_updated_at ON europanel.waste_water_sources;
 CREATE TRIGGER trg_waste_water_sources_updated_at
@@ -1258,13 +1258,13 @@ GRANT ALL ON europanel.waste_water_sources TO service_role;
 
 ALTER TABLE europanel.waste_water_sources ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_waste_water_sources_select" ON europanel.waste_water_sources
-  FOR SELECT TO authenticated USING (waste_water_discharges_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR SELECT TO authenticated USING (waste_water_discharge_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_waste_water_sources_insert" ON europanel.waste_water_sources
-  FOR INSERT TO authenticated WITH CHECK (waste_water_discharges_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR INSERT TO authenticated WITH CHECK (waste_water_discharge_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_waste_water_sources_update" ON europanel.waste_water_sources
-  FOR UPDATE TO authenticated USING (waste_water_discharges_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR UPDATE TO authenticated USING (waste_water_discharge_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 CREATE POLICY "ep_waste_water_sources_delete" ON europanel.waste_water_sources
-  FOR DELETE TO authenticated USING (waste_water_discharges_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
+  FOR DELETE TO authenticated USING (waste_water_discharge_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
 
 -- ─── waste_section — page 9, 1:1 avec la soumission ───────────────────────────────
 CREATE TABLE IF NOT EXISTS europanel.waste_section (

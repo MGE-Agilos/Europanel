@@ -20,6 +20,7 @@ import { pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const { SCHEMA, LISTS } = require('../docs/fields.js');
+const { parentColumn: parentColumnOf } = require('../docs/db.js');
 
 const SQL_TYPE = { text: 'TEXT', num: 'NUMERIC', int: 'SMALLINT', bool: 'BOOLEAN' };
 
@@ -45,8 +46,11 @@ function columnNames(entry) {
 /* ── Parenté ──────────────────────────────────────────────────────────── */
 
 // Colonne portant le rattachement : la soumission, ou la table parente.
+// Le cas « table parente » délègue à docs/db.js : c'est la seule source du
+// nom singulier explicite (parentCol), pour que le générateur et le futur
+// code de dispatch ne puissent jamais répondre différemment.
 function parentColumn(entry) {
-  return entry.parent ? `${entry.parent}_id` : 'submission_id';
+  return entry.parent ? parentColumnOf(entry) : 'submission_id';
 }
 
 // Prédicat RLS : remonte la chaîne de parenté jusqu'à submissions.user_id.
@@ -58,7 +62,7 @@ function ownerPredicate(table) {
   if (!entry.parent) {
     return 'submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())';
   }
-  return `${entry.parent}_id IN (SELECT id FROM europanel.${entry.parent} WHERE ` +
+  return `${parentColumn(entry)} IN (SELECT id FROM europanel.${entry.parent} WHERE ` +
          `${ownerPredicate(entry.parent)})`;
 }
 
@@ -78,7 +82,7 @@ function tableDdl(table, entry) {
       if (!SCHEMA[entry.parent]) {
         throw new Error(`${table}: parent « ${entry.parent} » absent du manifeste`);
       }
-      cols.push([`${entry.parent}_id`,
+      cols.push([parentColumn(entry),
         `BIGINT NOT NULL REFERENCES europanel.${entry.parent}(id) ON DELETE CASCADE`]);
     } else {
       cols.push(['submission_id',

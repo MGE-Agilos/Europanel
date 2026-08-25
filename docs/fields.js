@@ -272,7 +272,10 @@
     },
 
     combustion_unit_fuels: {
-      kind: 'keyed', page: 4, parent: 'combustion_units',
+      // parentCol au singulier explicite : deriver du nom de table imposerait
+      // de deviner un singulier anglais (combustion_units -> combustion_unit),
+      // ce qui marche ici mais ne generalise pas a la prochaine table.
+      kind: 'keyed', page: 4, parent: 'combustion_units', parentCol: 'combustion_unit_id',
       pattern: 'cu_{parent_idx}_fuel_{code}_{col}', list: 'fuels',
       // Le champ HTML est ..._desc ; desc est un mot reserve PostgreSQL.
       aliases: { description: 'desc' },
@@ -335,13 +338,17 @@
     },
 
     abatement_technique_sources: {
+      // parentCol au singulier explicite : voir combustion_unit_fuels plus haut.
       kind: 'keyed', page: 6, parent: 'abatement_techniques',
+      parentCol: 'abatement_technique_id',
       pattern: 'tech_{parent_idx}_src_{code}_{col}', list: 'waste_gas_sources',
       cols: { yn: 'text', spec: 'text' },
     },
 
     abatement_technique_flows: {
+      // parentCol au singulier explicite : voir combustion_unit_fuels plus haut.
       kind: 'keyed', page: 6, parent: 'abatement_techniques',
+      parentCol: 'abatement_technique_id',
       pattern: 'tech_{parent_idx}_{code}_{col}', list: 'abatement_flows',
       cols: { val: 'num', comment: 'text' },
     },
@@ -369,7 +376,8 @@
     },
 
     emission_point_pollutants: {
-      kind: 'keyed', page: 7, parent: 'emission_points',
+      // parentCol au singulier explicite : voir combustion_unit_fuels (page 4).
+      kind: 'keyed', page: 7, parent: 'emission_points', parentCol: 'emission_point_id',
       pattern: 'ep_{parent_idx}_poll_{code}_{col}', list: 'pollutants',
       // Le champ HTML est ..._limit ; la colonne ne peut pas s'appeler limit,
       // mot reserve SQL. C'est precisement le cas qui a motive les alias.
@@ -398,13 +406,17 @@
     },
 
     waste_water_pollutants: {
+      // parentCol au singulier explicite : voir combustion_unit_fuels (page 4).
       kind: 'keyed', page: 8, parent: 'waste_water_discharges',
+      parentCol: 'waste_water_discharge_id',
       pattern: 'ww_{parent_idx}_poll_{code}_{col}', list: 'ww_pollutants',
       cols: { conc: 'num', freq: 'text', pos: 'text', comments: 'text' },
     },
 
     waste_water_sources: {
+      // parentCol au singulier explicite : voir combustion_unit_fuels (page 4).
       kind: 'keyed', page: 8, parent: 'waste_water_discharges',
+      parentCol: 'waste_water_discharge_id',
       pattern: 'ww_{parent_idx}_src_{code}_{col}', list: 'ww_sources',
       cols: { vol: 'num', comment: 'text' },
     },
