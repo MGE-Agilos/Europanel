@@ -7,6 +7,16 @@
    Genres d'entrée   : 'one'   table 1:1 avec la soumission
                        'many'  section répétable, indexée par {idx}
                        'keyed' groupe à clés fixes, indexé par {code}
+
+   Les types sont établis d'après le HTML réellement rendu, jamais d'après le
+   nom du champ. Un <input type="number"> est 'num' ; une année ou un
+   compteur est 'int' ; une case à cocher est 'bool'. Tout ce que le renderer
+   a choisi de rendre en input texte reste 'text' : ce choix est délibéré, et
+   typer numériquement une saisie libre (« <= 50 », « 2024 (estimation) »)
+   la mettrait à null sans le moindre avertissement.
+
+   Les listes de codes et l'ordre des colonnes suivent l'ordre d'émission des
+   renderers, vérifié par tools/extract_fields.mjs.
    ══════════════════════════════════════════════════════════════════════ */
 (function (root, factory) {
   const api = factory();
@@ -18,13 +28,61 @@
   // Codes des groupes a cles fixes. Refletent les tableaux const des renderers
   // et alimentent le seed de ref_lists.
   const LISTS = {
+
+    /* ── page 1 ─────────────────────────────────────────────────────── */
+    // OTHER_ACT de renderPage1. 'other_specify' est la ligne a libelle libre.
+    site_activities: ['sawmill', 'glue', 'impreg_paper', 'paper_lam', 'other_value',
+                      'combustion', 'incineration', 'ww_treatment', 'landfill',
+                      'other_activities', 'other_specify'],
+
+    /* ── page 2 ─────────────────────────────────────────────────────── */
+    storage_types: ['outdoor', 'indoor', 'silos'],
+    // Les trois operations de la matrice 2.2 (colonnes du tableau).
+    wood_prep_stages: ['debark', 'chip', 'other_chip'],
+    // Les neuf parametres de la matrice 2.2 (lignes du tableau). Ils servent
+    // de cles a la table des commentaires, indexee par parametre et non par
+    // operation : s22_comments_airflow porte un commentaire pour la ligne
+    // « Airflow », pas pour l'une des trois operations.
+    wood_prep_params: ['process_desc', 'prod_t_batch', 'wood_dry', 'airflow',
+                       'chan_air', 'chan_treated', 'emit_limit', 'dust_method',
+                       'monitoring'],
+
+    /* ── page 3 ─────────────────────────────────────────────────────── */
     raw_materials: ['roundwood', 'vir_forest', 'sawdust', 'ext_prod_res',
                     'ext_recycled', 'nonwood', 'other'],
+    // Seules ces deux lignes de RAW_MATS portent r.specify : leur libelle est
+    // un champ de saisie et non un texte fixe. Declarer 'specify' sur les sept
+    // codes creerait cinq colonnes que le formulaire n'emet jamais.
+    raw_materials_specify: ['nonwood', 'other'],
+    additives: ['wax', 'other_add'],
+
+    /* ── page 4 ─────────────────────────────────────────────────────── */
+    fuels: ['prod_res', 'liquid', 'natgas', 'rec_ext', 'rec_waste', 'biomass', 'other'],
+
+    /* ── page 6 ─────────────────────────────────────────────────────── */
+    // WG_SOURCES : procedes dont les gaz alimentent la technique d'abattement.
+    waste_gas_sources: ['dryer', 'press', 'paper', 'other'],
+    // Bilan gazeux de la technique d'abattement (une ligne par poste).
+    abatement_flows: ['intake', 'recycled', 'discharge', 'waste_res'],
+
+    /* ── page 7 ─────────────────────────────────────────────────────── */
+    // POLLUTANTS de renderPage7, dans l'ordre d'emission. Le tableau du
+    // renderer compte 37 entrees, mais 'org_acids' et 'aldehydes' portent
+    // parent:true : ce sont des lignes de sous-titre, sans aucun input. Les
+    // inclure creerait douze colonnes sans champ. D'ou 35 codes et non 37.
     pollutants: ['pm', 'so2', 'nox', 'co', 'nh3', 'hcho', 'nmvoc', 'toc', 'voc',
                  'cvoc', 'terpene', 'org_acids'],
+
+    /* ── page 8 ─────────────────────────────────────────────────────── */
+    ww_pollutants: ['flow', 'ph', 'tss', 'bod5', 'cod', 'toc', 'thc', 'total_n',
+                    'tan', 'nh4', 'other_1', 'other_2', 'other_3'],
+    ww_sources: ['refining', 'cleaning', 'manuf', 'runoff_pond', 'runoff_other',
+                 'abatement', 'firefighting', 'open'],
   };
 
   const SCHEMA = {
+
+    /* ══ page 0 — Cover & Contact ══════════════════════════════════════ */
 
     contacts: {
       kind: 'one', page: 0,
@@ -36,6 +94,96 @@
         twg_ngo_company: 'text', twg_ngo_name: 'text', twg_ngo_job_title: 'text',
         twg_ngo_email: 'text', twg_ngo_telephone: 'text',
       },
+    },
+
+    /* ══ page 1 — General Information ══════════════════════════════════ */
+
+    general_info: {
+      kind: 'one', page: 1,
+      cols: {
+        plant_name: 'text', production_started: 'int',
+        location_city: 'text', location_country: 'text', company: 'text',
+        ref_year: 'int', comments: 'text',
+        // Trois exceptions du tableau 1.7. La colonne « unite » n'est un champ
+        // de saisie que pour les deux lignes dont l'unite n'est pas imposee,
+        // et le libelle n'est saisissable que pour la ligne « other_specify ».
+        // Les porter dans site_activities creerait des colonnes sans champ
+        // pour les neuf autres codes ; elles sont bien 1:1 avec la soumission.
+        act_other_activities_unit: 'text',
+        act_other_specify_unit: 'text',
+        act_other_specify_label: 'text',
+      },
+    },
+
+    plant_products: {
+      // Quatre lignes fixes, sans compteur cache : le renderer rend toujours
+      // prod_1 a prod_4. countInstances sonde donc la carte plate.
+      kind: 'many', page: 1, pattern: 'prod_{idx}_{col}',
+      cols: {
+        type: 'text', addinfo: 'text', qty: 'num', unit: 'text', daily: 'num',
+      },
+    },
+
+    site_activities: {
+      kind: 'keyed', page: 1, pattern: 'act_{code}_{col}', list: 'site_activities',
+      // present et ippc sont des selects Oui/Non ('y'/'n'), pas des cases a
+      // cocher : 'bool' les lirait via value === 'on' et rendrait tout false.
+      cols: { present: 'text', ippc: 'text', capacity: 'num' },
+    },
+
+    /* ══ page 2 — WBP Plant Layout ═════════════════════════════════════ */
+
+    plant_layout_section: {
+      kind: 'one', page: 2,
+      cols: {
+        ref_year: 'int',
+        s21_comments: 'text', s22_comments: 'text',
+        // 2.3 — broyage de bois recycle
+        s23_present: 'text', s23_hours: 'num', s23_capacity: 'num',
+        s23_chan_air: 'num', s23_chan_treated: 'text', s23_emit_limit: 'text',
+        s23_dust_method: 'text', s23_monitoring: 'text', s23_comments: 'text',
+        // 2.4 et 2.5 — autres sources de poussieres
+        s24_desc: 'text', s24_chan_air: 'num', s24_chan_treated: 'text',
+        s24_dust_method: 'text', s24_comments: 'text',
+        s25_desc: 'text', s25_chan_air: 'num', s25_chan_treated: 'text',
+        s25_dust_method: 'text', s25_comments: 'text',
+      },
+    },
+
+    raw_material_storage: {
+      kind: 'keyed', page: 2, pattern: 'stor_{code}_{col}', list: 'storage_types',
+      cols: { pct: 'num', cap: 'num', area: 'num' },
+    },
+
+    wood_prep_operations: {
+      kind: 'keyed', page: 2, pattern: 's22_{code}_{col}', list: 'wood_prep_stages',
+      // Toutes les cellules de la matrice sont des inputs texte, y compris
+      // celles dont l'en-tete annonce une unite (Nm3/h, t dry/h) : le renderer
+      // n'utilise numUnit() nulle part ici. Les typer 'num' detruirait les
+      // saisies du type « 12 000–15 000 » ou « n.a. ».
+      cols: {
+        process_desc: 'text', prod_t_batch: 'text', wood_dry: 'text',
+        airflow: 'text', chan_air: 'text', chan_treated: 'text',
+        emit_limit: 'text', dust_method: 'text', monitoring: 'text',
+      },
+    },
+
+    wood_prep_param_comments: {
+      // Un commentaire par parametre, et non par operation : la cle est le
+      // parametre. Le motif place donc {col} avant {code}, ce qui produit
+      // s22_comments_airflow — et non l'inverse.
+      kind: 'keyed', page: 2, pattern: 's22_{col}_{code}', list: 'wood_prep_params',
+      cols: { comments: 'text' },
+    },
+
+    raw_materials_section: {
+      kind: 'one', page: 3,
+      cols: { s32_comments: 'text' },
+    },
+
+    raw_materials: {
+      kind: 'keyed', page: 3, pattern: 'rm_{code}_{col}', list: 'raw_materials',
+      cols: { specify: 'text', species: 'text', source: 'text' },
     },
 
     press_dryer_section: {
@@ -54,16 +202,6 @@
         product_dried: 'num', drying_rate: 'num',
         residence_val: 'num', residence_unit: 'text',
       },
-    },
-
-    raw_materials_section: {
-      kind: 'one', page: 3,
-      cols: { s32_comments: 'text' },
-    },
-
-    raw_materials: {
-      kind: 'keyed', page: 3, pattern: 'rm_{code}_{col}', list: 'raw_materials',
-      cols: { specify: 'text', species: 'text', source: 'text' },
     },
 
     emission_points: {
@@ -96,7 +234,6 @@
         limit_val: 'text',
       },
     },
-
   };
 
   return { SCHEMA, LISTS };
