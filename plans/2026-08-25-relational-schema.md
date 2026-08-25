@@ -4,7 +4,7 @@
 
 **Goal:** Remplacer le stockage JSONB du questionnaire WBP BREF par 42 tables PostgreSQL typées — 35 décrites par le manifeste, 7 tables de noyau écrites à la main — une colonne par champ, sans modifier les treize fonctions de rendu du formulaire.
 
-**Architecture:** Un manifeste déclaratif (`docs/fields.js`) décrit la correspondance entre les noms de champs HTML existants et les colonnes des tables. Un dispatcher (`docs/db.js`) traduit la carte plate `{nom: valeur}` — représentation conservée en mémoire — vers les tables à l'écriture, et la reconstruit à la lecture. Le DDL SQL et les politiques RLS sont **générés** depuis le manifeste, jamais écrits à la main. Le script de reprise des données réutilise le même dispatcher, ce qui rend toute divergence impossible entre les deux chemins d'écriture.
+**Architecture:** Un manifeste déclaratif (`docs/fields.js`) décrit la correspondance entre les noms de champs HTML existants et les colonnes des tables. Le webform écrit les tables métier **et** conserve la carte plate brute en JSONB dans `submission_pages.raw`, ce qui rend les tables régénérables et retire à toute erreur de correspondance son caractère irréversible. Un dispatcher (`docs/db.js`) traduit la carte plate `{nom: valeur}` — représentation conservée en mémoire — vers les tables à l'écriture, et la reconstruit à la lecture. Le DDL SQL et les politiques RLS sont **générés** depuis le manifeste, jamais écrits à la main. Le script de reprise des données réutilise le même dispatcher, ce qui rend toute divergence impossible entre les deux chemins d'écriture.
 
 **Tech Stack:** JavaScript ES2020 sans build step, Supabase (PostgreSQL 15+), runner de test intégré `node --test` (aucune dépendance externe).
 
@@ -1800,11 +1800,17 @@ CREATE TABLE IF NOT EXISTS europanel.ref_lists (
   PRIMARY KEY (list_code, code)
 );
 
+-- Successeure de page_data : porte l'avancement et la charge brute.
+-- `raw` est la carte plate telle que collectFormData l'a produite. Elle n'est
+-- pas relue en fonctionnement normal, mais elle rend les tables metier
+-- regenerables : une colonne oubliee puis ajoutee au manifeste se rattrape en
+-- rejouant dispatch() sur l'historique, sans rien redemander aux entreprises.
 CREATE TABLE IF NOT EXISTS europanel.submission_pages (
   submission_id BIGINT NOT NULL REFERENCES europanel.submissions(id) ON DELETE CASCADE,
   page_id       SMALLINT NOT NULL,
   status        TEXT NOT NULL DEFAULT 'empty'
                 CHECK (status IN ('empty','partial','complete')),
+  raw           JSONB NOT NULL DEFAULT '{}',
   saved_at      TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (submission_id, page_id)
 );
@@ -2070,9 +2076,13 @@ async function savePageData(pageId, data) {
       }
     }
 
+    // La carte plate brute est conservee a cote des tables metier. Elle n'est
+    // pas relue en fonctionnement normal : elle existe pour que les tables
+    // soient regenerables si le manifeste se revele incomplet.
     await sb.from('submission_pages').upsert(
       { submission_id: subId, page_id: pageId,
         status: hasContent(data) ? 'complete' : 'empty',
+        raw: data,
         saved_at: new Date().toISOString() },
       { onConflict: 'submission_id,page_id' }
     );

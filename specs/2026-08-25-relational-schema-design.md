@@ -23,8 +23,25 @@ ajout de champ, mais il présente trois limites qui deviennent bloquantes :
    export structuré, reprise par un tiers) reposent sur un modèle lisible sans
    l'application. Un dump JSONB satisfait la lettre de l'engagement, pas son esprit.
 
-**Décision :** le JSONB disparaît du chemin d'écriture. Le webform écrit directement
-dans des tables métier typées, une colonne par champ.
+**Décision :** le webform écrit directement dans des tables métier typées, une colonne
+par champ.
+
+**Et il conserve la carte plate brute en JSONB, à côté.** Non par indécision, mais
+parce que la couche de correspondance entre le formulaire et les colonnes est un
+nouveau point de défaillance silencieux, et que trois défauts de cette classe ont déjà
+été trouvés pendant la construction : une colonne dont le nom ne correspondait à aucun
+champ réel, seize colonnes absentes de l'inventaire, et des espaces convertis en zéro.
+
+L'asymétrie est ce qui justifie le filet. Qlik a besoin de tables plates dans tous les
+cas, donc la correspondance sera écrite de toute façon ; seul son côté change. Une
+erreur du côté lecture donne un tableau de bord faux, que l'on corrige en régénérant
+depuis la donnée brute toujours présente. Une erreur du côté écriture signifie que la
+donnée n'a jamais été capturée : il faut retourner la demander aux entreprises
+membres. Sur une collecte réglementaire de trois ans, ce second cas n'est pas
+acceptable.
+
+La charge brute rend les tables relationnelles **régénérables à tout moment**, ce qui
+retire à toute erreur de correspondance son caractère irréversible.
 
 ---
 
@@ -47,6 +64,34 @@ renderers  ⇄  état plat {nom: valeur}  ⇄  dispatcher + manifeste  ⇄  ~40 
 Conséquence : **aucun renderer n'est modifié**. Le changement est circonscrit à
 `app.js` (chemins save/load), à un nouveau module `fields.js` (le manifeste), et au
 SQL. C'est ce qui rend la migration réalisable sans réécrire le questionnaire.
+
+### 2.1 Le filet : la charge brute
+
+À chaque sauvegarde, le webform écrit deux choses dans la même opération :
+
+1. les lignes des tables métier, produites par le dispatcher ;
+2. la carte plate brute, telle que `collectFormData()` l'a produite, dans
+   `submission_pages.raw`.
+
+La charge brute n'est jamais lue par l'application en fonctionnement normal — les
+renderers sont alimentés depuis les tables, comme prévu. Elle sert à trois choses :
+
+- **Régénérer.** `submission_pages.raw` → `dispatch()` → tables. Une colonne oubliée
+  puis ajoutée au manifeste se rattrape en rejouant la régénération sur l'historique,
+  sans rien redemander aux entreprises membres.
+- **Prouver.** En cas de contestation d'une valeur par un opérateur, la charge brute
+  est ce que le navigateur a réellement envoyé, indépendamment de l'interprétation
+  qu'en a faite la couche de correspondance.
+- **Rendre la reprise rejouable.** Le script de migration (§ 7) alimente `raw` d'abord,
+  puis régénère les tables depuis `raw`. Il devient idempotent : on peut le relancer
+  autant de fois que nécessaire pendant la mise au point.
+
+Le coût est négligeable : la base entière fait moins de dix mégaoctets, et la charge
+brute d'une soumission complète pèse quelques dizaines de kilooctets.
+
+Ce que le filet ne fait **pas** : il ne dispense pas des tests de couverture du § 8.
+Une donnée récupérable mais jamais remarquée reste une donnée perdue. Le filet borne
+les conséquences d'une erreur, il ne la détecte pas.
 
 ---
 
@@ -120,7 +165,7 @@ Le seed est produit depuis les tableaux JS par script, pas retapé à la main.
 | `plants` | **Nouvelle.** Installation. Une société peut en exploiter plusieurs. |
 | `cycles` | **Nouvelle.** Cycle de reporting : libellé, période de référence, dates d'ouverture et de clôture, statut. |
 | `submissions` | Étendue : `company_id`, `plant_id`, `cycle_id`, `status`, `submitted_at`, `approved_at`. |
-| `submission_pages` | Avancement par page : `(submission_id, page_id, status, saved_at)`. Remplace le rôle de suivi que tenait `page_data`. |
+| `submission_pages` | Successeure de `page_data` : `(submission_id, page_id, status, raw JSONB, saved_at)`. Porte l'avancement **et** la carte plate brute telle que soumise (§ 2.1). |
 | `ref_lists` | Listes de valeurs (§ 3.3). |
 | `audit_log` | **Nouvelle.** Journal append-only : acteur, action, table, enregistrement, champ, valeur avant/après, horodatage UTC. |
 
@@ -371,10 +416,15 @@ Script `supabase/migrate/jsonb_to_relational.mjs`, exécuté hors ligne avec la 
 `service_role` lue depuis `.env`.
 
 1. Lire toutes les lignes de `page_data`.
-2. Passer chaque `data` JSONB **dans le même `dispatch()`** que celui utilisé par le
-   webform. Le module est importé, pas réimplémenté : aucune divergence possible entre
-   le chemin de migration et le chemin d'écriture.
-3. Écrire les tables cibles.
+2. Recopier chaque `data` JSONB tel quel dans `submission_pages.raw`. Cette étape ne
+   perd rien par construction : c'est une copie, pas une interprétation.
+3. Régénérer les tables métier **depuis `submission_pages.raw`**, en passant par le
+   même `dispatch()` que le webform. Le module est importé, pas réimplémenté : aucune
+   divergence possible entre le chemin de migration et le chemin d'écriture.
+
+Séparer les étapes 2 et 3 rend la reprise **idempotente** : l'étape 3 peut être
+relancée autant de fois que nécessaire, notamment après avoir complété le manifeste,
+sans jamais retoucher à `page_data` ni redemander quoi que ce soit aux entreprises.
 4. Produire un rapport :
    - nombre de lignes créées par table ;
    - **liste des clés JSONB non reconnues par le manifeste**, avec leur `submission_id`
