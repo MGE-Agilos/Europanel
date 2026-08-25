@@ -1012,9 +1012,17 @@ Puis dans `SCHEMA` :
     emission_point_pollutants: {
       kind: 'keyed', page: 7, parent: 'emission_points',
       pattern: 'ep_{parent_idx}_poll_{code}_{col}', list: 'pollutants',
+      // Le champ HTML est ..._limit ; la colonne ne peut pas s'appeler limit,
+      // mot reserve SQL. C'est precisement le cas qui a motive les alias.
+      aliases: { limit_val: 'limit' },
       cols: {
         conc: 'num', method: 'text', t_year: 'num',
-        short_term: 'text', short_val: 'num', limit_val: 'num',
+        short_term: 'text', short_val: 'num',
+        // 'text' et non 'num' : le renderer utilise deliberement un input
+        // texte, car une limite de permis s'ecrit souvent « <= 50 » ou
+        // « 50 (moyenne journaliere) ». La typer numerique mettrait ces
+        // valeurs a null sans avertissement.
+        limit_val: 'text',
       },
     },
 ```
@@ -1205,7 +1213,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const { SCHEMA, LISTS } = require('../docs/fields.js');
-const { buildName } = require('../docs/db.js');
+const { buildName, fieldSegment } = require('../docs/db.js');
 
 // Tous les noms de champs que le manifeste sait produire.
 function manifestNames() {
@@ -1233,14 +1241,55 @@ function manifestNames() {
   return names;
 }
 
+function readRenderer(f) {
+  return fs.readFileSync(path.join(__dirname, '..', 'docs', f), 'utf8');
+}
+
+const RENDERERS = ['pages-0-6.js', 'pages-7-12.js'];
+
 // Noms littéraux présents dans les renderers : name="quelque_chose".
 function rendererLiteralNames() {
   const names = new Set();
-  for (const f of ['pages-0-6.js', 'pages-7-12.js']) {
-    const src = fs.readFileSync(path.join(__dirname, '..', 'docs', f), 'utf8');
-    for (const m of src.matchAll(/name="([a-z0-9_]+)"/g)) names.add(m[1]);
+  for (const f of RENDERERS) {
+    for (const m of readRenderer(f).matchAll(/name="([a-z0-9_]+)"/g)) names.add(m[1]);
   }
   return names;
+}
+
+// Noms construits par gabarit : name="dryer_${di}_temp_max".
+// Ils forment la majorite du questionnaire — secheurs, presses, polluants,
+// effluents — et echappent entierement au balayage litteral ci-dessus.
+// C'est par cette faille que ep_N_poll_KEY_limit a pu etre declare limit_val
+// dans le manifeste sans que rien ne signale que la colonne ne serait jamais
+// ni ecrite ni relue.
+// On normalise chaque interpolation ${...} en un jeton {} : on compare des
+// squelettes de noms, pas des valeurs.
+const INTERP = /\$\{[^}]*\}/g;
+
+function rendererTemplateShapes() {
+  const shapes = new Set();
+  for (const f of RENDERERS) {
+    const re = /name="((?:[a-zA-Z0-9_]|\$\{[^}]*\})+)"/g;
+    for (const m of readRenderer(f).matchAll(re)) {
+      if (!m[1].includes('${')) continue;
+      shapes.add(m[1].replace(INTERP, '{}'));
+    }
+  }
+  return shapes;
+}
+
+// Squelettes que le manifeste sait produire, dans la meme normalisation.
+function manifestShapes() {
+  const shapes = new Set();
+  for (const entry of Object.values(SCHEMA)) {
+    if (entry.kind === 'one') continue;
+    for (const col of Object.keys(entry.cols)) {
+      shapes.add(entry.pattern
+        .replace(/\{(idx|parent_idx|code)\}/g, '{}')
+        .replace('{col}', fieldSegment(entry, col)));
+    }
+  }
+  return shapes;
 }
 
 test('chaque champ littéral des renderers a une colonne déclarée', () => {
@@ -1248,6 +1297,25 @@ test('chaque champ littéral des renderers a une colonne déclarée', () => {
   const missing = [...rendererLiteralNames()].filter(n => !known.has(n));
   assert.deepStrictEqual(missing, [],
     'champs sans colonne dans le manifeste : ' + missing.join(', '));
+});
+
+test('chaque champ construit par gabarit a une colonne declaree', () => {
+  // Sans ce test, seuls les champs a nom litteral sont couverts, soit une
+  // minorite du questionnaire.
+  const known = manifestShapes();
+  const missing = [...rendererTemplateShapes()].filter(sh => !known.has(sh));
+  assert.deepStrictEqual(missing, [],
+    'gabarits sans colonne dans le manifeste : ' + missing.join(', '));
+});
+
+test('chaque motif du manifeste correspond a un champ reel', () => {
+  // Le sens inverse, et le plus insidieux : une colonne declaree que le
+  // formulaire n'emet jamais ne sera ni ecrite ni relue, sans erreur ni
+  // avertissement. C'est exactement ce qui est arrive a limit_val.
+  const real = rendererTemplateShapes();
+  const orphans = [...manifestShapes()].filter(sh => !real.has(sh));
+  assert.deepStrictEqual(orphans, [],
+    'colonnes sans champ correspondant : ' + orphans.join(', '));
 });
 
 test('le manifeste couvre les 33 tables du questionnaire', () => {
