@@ -68,5 +68,48 @@
     return (entry.aliases && entry.aliases[col]) || col;
   }
 
-  return { toDb, fromDb, buildName, fieldSegment, SCHEMA };
+  /* ── Dispatch ─────────────────────────────────────────────────────── */
+
+  // Retourne les entrées du manifeste appartenant à une page donnée.
+  function entriesForPage(pageId) {
+    return Object.entries(SCHEMA).filter(([, e]) => e.page === pageId);
+  }
+
+  // Carte plate → opérations d'écriture, une par table.
+  // Forme : [{ table, kind, rows: [...] }]
+  function dispatch(flat, pageId) {
+    const ops = [];
+    for (const [table, entry] of entriesForPage(pageId)) {
+      if (entry.kind === 'one') {
+        const row = {};
+        for (const [col, type] of Object.entries(entry.cols)) {
+          row[col] = toDb(flat[col], type);
+        }
+        ops.push({ table, kind: 'one', rows: [row] });
+      }
+    }
+    return ops;
+  }
+
+  /* ── Hydratation ──────────────────────────────────────────────────── */
+
+  // Lignes lues en base → carte plate attendue par les renderers.
+  // `rowsByTable` a la forme { nom_table: [ligne, …] }.
+  function hydrate(rowsByTable, pageId) {
+    const flat = {};
+    for (const [table, entry] of entriesForPage(pageId)) {
+      const rows = rowsByTable[table] || [];
+      if (entry.kind === 'one') {
+        const row = rows[0];
+        if (!row) continue;
+        for (const [col, type] of Object.entries(entry.cols)) {
+          const v = fromDb(row[col], type);
+          if (v !== undefined) flat[col] = v;
+        }
+      }
+    }
+    return flat;
+  }
+
+  return { toDb, fromDb, buildName, fieldSegment, dispatch, hydrate, SCHEMA };
 });
