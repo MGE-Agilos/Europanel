@@ -176,14 +176,80 @@
       cols: { comments: 'text' },
     },
 
+    /* ══ page 3 — Raw materials, resins and additives ══════════════════ */
+
     raw_materials_section: {
       kind: 'one', page: 3,
-      cols: { s32_comments: 'text' },
+      cols: { ref_year: 'int', s32_comments: 'text' },
     },
 
     raw_materials: {
       kind: 'keyed', page: 3, pattern: 'rm_{code}_{col}', list: 'raw_materials',
-      cols: { specify: 'text', species: 'text', source: 'text' },
+      cols: { pct: 'num', species: 'text', source: 'text' },
+    },
+
+    raw_material_specify: {
+      // Voir LISTS.raw_materials_specify : seules deux des sept lignes ont un
+      // libelle saisissable. Table distincte plutot qu'une colonne de plus sur
+      // raw_materials, qui produirait cinq colonnes sans champ.
+      kind: 'keyed', page: 3, pattern: 'rm_{code}_{col}', list: 'raw_materials_specify',
+      cols: { specify: 'text' },
+    },
+
+    resins: {
+      kind: 'many', page: 3, pattern: 'resin_{idx}_{col}',
+      cols: { type: 'text', pct: 'num', comments: 'text' },
+    },
+
+    hardeners: {
+      // Indexe, malgre l'apparence : hard_1_type et hard_2_type sont deux
+      // lignes anonymes, pas deux codes fixes.
+      kind: 'many', page: 3, pattern: 'hard_{idx}_{col}',
+      cols: { type: 'text', comments: 'text' },
+    },
+
+    additives: {
+      // A cles, malgre l'apparence symetrique avec hardeners : add_wax_* et
+      // add_other_add_* nomment deux additifs identifies.
+      kind: 'keyed', page: 3, pattern: 'add_{code}_{col}', list: 'additives',
+      cols: { type: 'text', comments: 'text' },
+    },
+
+    /* ══ page 4 — Energy production ════════════════════════════════════ */
+
+    energy_section: {
+      kind: 'one', page: 4,
+      cols: {
+        ref_year: 'int', comments: 'text', s41_diagram_ref: 'text',
+        s43_steam: 'num', s43_hot_oil: 'num', s43_fluegas: 'num', s43_other: 'num',
+        s43_cold_startups: 'int', s43_warm_startups: 'int',
+        s43_maintenance_desc: 'text',
+      },
+    },
+
+    combustion_units: {
+      kind: 'many', page: 4, pattern: 'cu_{idx}_{col}', countField: 'cu_count',
+      cols: {
+        general_process: 'text', equip_type: 'text', boiler_detail: 'text',
+        engine_ignition: 'text', chp: 'text', suppl_fire: 'text', dual_fuel: 'text',
+        install_year: 'int',
+        thermal_input: 'num', energy_output: 'num',
+        hours_normal: 'num', hours_special: 'num',
+        // Cinq emplacements de sortie energetique (MW), numerotes et non
+        // nommes par le formulaire. Ce sont cinq attributs distincts de la
+        // meme unite de combustion, pas une sous-section repetable : le
+        // dispatcher ne sait pas imbriquer une entree 'many' sous une autre.
+        output_1: 'num', output_2: 'num', output_3: 'num',
+        output_4: 'num', output_5: 'num',
+      },
+    },
+
+    combustion_unit_fuels: {
+      kind: 'keyed', page: 4, parent: 'combustion_units',
+      pattern: 'cu_{parent_idx}_fuel_{code}_{col}', list: 'fuels',
+      // Le champ HTML est ..._desc ; desc est un mot reserve PostgreSQL.
+      aliases: { description: 'desc' },
+      cols: { pct: 'num', description: 'text' },
     },
 
     press_dryer_section: {
