@@ -30,41 +30,92 @@ test.before(async () => {
 // un chiffre : other_1, other_2 et other_3 page 8, output_1 a output_5 page 4.
 // Le test cesserait alors de voir qu'une colonne manque parmi eux, ce qui est
 // exactement le defaut qu'il existe pour attraper.
-function shapeToRegExp(shape) {
-  const escaped = shape.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp('^' + escaped.replace(/\\\{\\\}/g, '(?:\\d+)') + '$');
+//
+// Mais un \d+ non lie ouvre une autre faille, plus sournoise que celle qu'il
+// resout : il suffit qu'UN SEUL indice satisfasse le motif pour que le test
+// « chaque colonne declaree correspond a un champ reellement emis » se taise
+// sur tous les autres. Si le renderer emettait cu_1_thermal_input mais pas
+// cu_2_thermal_input (une colonne oubliee a partir de la deuxieme unite), la
+// forme cu_{}_thermal_input matcherait quand meme via cu_1_thermal_input, et
+// l'absence a l'indice 2 resterait invisible. D'ou la liaison ci-dessous :
+// pour chaque entree du manifeste, on determine les indices REELLEMENT
+// presents dans la verite terrain (via une colonne quelconque de cette
+// entree, jamais fournis par le manifeste lui-meme), puis on construit le
+// nom exact attendu a CHAQUE indice pour CHAQUE colonne, et on compare des
+// chaines exactes — plus aucun \d+ ne masque un trou ponctuel.
+
+// Expression reguliere qui isole, dans la verite terrain, la valeur du seul
+// jeton `token` (idx ou parent_idx) d'un motif — tous les autres jetons etant
+// remplaces par leur valeur connue (`parts`). Sert a decouvrir quels indices
+// concrets une entree utilise reellement, a partir d'une de ses colonnes.
+function patternToIndexRegExp(pattern, token, parts) {
+  const PLACEHOLDER = '';
+  const literal = pattern.replace(/\{(idx|parent_idx|code|col)\}/g,
+    (_, t) => (t === token ? PLACEHOLDER : String(parts[t])));
+  const escaped = literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('^' + escaped.replace(PLACEHOLDER, '(\\d+)') + '$');
 }
 
-// Formes de noms que le manifeste sait produire pour une page donnee,
-// les indices d'instance etant representes par le jeton {}.
-function manifestShapes(pageId) {
-  const shapes = new Set();
-  for (const entry of Object.values(SCHEMA)) {
-    if (entry.page !== pageId) continue;
-    if (entry.kind === 'one') {
-      Object.keys(entry.cols).forEach(c => shapes.add(c));
-      continue;
-    }
-    if (entry.countField) shapes.add(entry.countField);
-    const codes = entry.kind === 'keyed' ? LISTS[entry.list] : [null];
+// Indices concrets (idx ou parent_idx) qu'une entree utilise reellement sur
+// une page, d'apres la verite terrain — jamais d'apres une valeur par defaut
+// du manifeste. On les cherche via TOUTES les colonnes de l'entree (et tous
+// les codes, si l'entree est a cles) : c'est ce qui permet de detecter
+// qu'une colonne precise manque a un indice ou les autres colonnes de la
+// meme entree sont bien presentes.
+function presentIndices(pageShapes, entry, token, codes) {
+  const found = new Set();
+  for (const col of Object.keys(entry.cols)) {
     for (const code of codes) {
-      for (const col of Object.keys(entry.cols)) {
-        const parts = { col: fieldSegment(entry, col) };
-        if (entry.pattern.includes('{idx}')) parts.idx = '{}';
-        if (entry.pattern.includes('{parent_idx}')) parts.parent_idx = '{}';
-        if (code !== null) parts.code = code;
-        shapes.add(buildName(entry.pattern, parts));
+      const parts = { col: fieldSegment(entry, col) };
+      if (code !== null) parts.code = code;
+      const re = patternToIndexRegExp(entry.pattern, token, parts);
+      for (const sh of pageShapes) {
+        const m = re.exec(sh);
+        if (m) found.add(m[1]);
       }
     }
   }
-  return shapes;
+  return [...found];
+}
+
+// Noms de champs EXACTS (indices lies, aucun \d+) que le manifeste attend
+// pour une page donnee, d'apres les indices reellement observes dans la
+// verite terrain de cette meme page.
+function manifestExactNames(pageId, pageShapes) {
+  const names = new Set();
+  for (const entry of Object.values(SCHEMA)) {
+    if (entry.page !== pageId) continue;
+    if (entry.kind === 'one') {
+      Object.keys(entry.cols).forEach(c => names.add(c));
+      continue;
+    }
+    if (entry.countField) names.add(entry.countField);
+
+    const codes = entry.kind === 'keyed' ? LISTS[entry.list] : [null];
+    const token = entry.pattern.includes('{idx}') ? 'idx'
+                : entry.pattern.includes('{parent_idx}') ? 'parent_idx'
+                : null;
+    const idxValues = token ? presentIndices(pageShapes, entry, token, codes) : [null];
+
+    for (const idxVal of idxValues) {
+      for (const code of codes) {
+        for (const col of Object.keys(entry.cols)) {
+          const parts = { col: fieldSegment(entry, col) };
+          if (code !== null) parts.code = code;
+          if (token) parts[token] = idxVal;
+          names.add(buildName(entry.pattern, parts));
+        }
+      }
+    }
+  }
+  return names;
 }
 
 test('chaque champ emis par le questionnaire a une colonne declaree', () => {
   const missing = [];
   for (const [page, shapes] of Object.entries(SHAPES_BY_PAGE)) {
-    const known = [...manifestShapes(Number(page))].map(shapeToRegExp);
-    shapes.filter(sh => !known.some(re => re.test(sh)))
+    const known = manifestExactNames(Number(page), shapes);
+    shapes.filter(sh => !known.has(sh))
       .forEach(sh => missing.push(`p${page}:${sh}`));
   }
   assert.deepStrictEqual(missing, [],
@@ -74,11 +125,14 @@ test('chaque champ emis par le questionnaire a une colonne declaree', () => {
 test('chaque colonne declaree correspond a un champ reellement emis', () => {
   // Le sens inverse, et le plus insidieux : une colonne que le formulaire
   // n'emet jamais ne sera ni ecrite ni relue, sans erreur ni avertissement.
+  // Comme les indices sont lies (voir plus haut), ceci detecte aussi bien
+  // une colonne jamais emise qu'une colonne emise a certains indices
+  // seulement.
   const orphans = [];
   for (const [page, shapes] of Object.entries(SHAPES_BY_PAGE)) {
-    for (const sh of manifestShapes(Number(page))) {
-      const re = shapeToRegExp(sh);
-      if (!shapes.some(real => re.test(real))) orphans.push(`p${page}:${sh}`);
+    const shapeSet = new Set(shapes);
+    for (const name of manifestExactNames(Number(page), shapes)) {
+      if (!shapeSet.has(name)) orphans.push(`p${page}:${name}`);
     }
   }
   assert.deepStrictEqual(orphans, [],
