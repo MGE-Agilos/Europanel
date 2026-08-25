@@ -29,6 +29,21 @@
       },
     },
 
+    press_dryer_section: {
+      kind: 'one', page: 5,
+      cols: { dryer_count: 'int', press_count: 'int', comments: 'text' },
+    },
+
+    dryers: {
+      kind: 'many', page: 5, pattern: 'dryer_{idx}_{col}', countField: 'dryer_count',
+      cols: {
+        ref_year: 'int', main_type: 'text', system_desc: 'text', product: 'text',
+        install_year: 'int', temp_min: 'num', temp_max: 'num',
+        product_dried: 'num', drying_rate: 'num',
+        residence_val: 'num', residence_unit: 'text',
+      },
+    },
+
   };
 
   return { SCHEMA };

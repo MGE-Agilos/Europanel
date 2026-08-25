@@ -75,6 +75,32 @@
     return Object.entries(SCHEMA).filter(([, e]) => e.page === pageId);
   }
 
+  const PROBE_CAP = 500;
+
+  // Nombre d'instances d'une section répétable présentes dans la carte plate.
+  // On privilégie le compteur déclaré (countField) : il fait autorité, car
+  // l'interface le maintient et il permet de détecter une instance supprimée
+  // dont les clés traînent encore dans la carte.
+  // À défaut, on sonde depuis 1 jusqu'au premier indice sans aucune colonne.
+  // L'interface renumérote les instances à la suppression : pas de trous.
+  function countInstances(flat, entry) {
+    if (entry.countField) {
+      const n = Number(flat[entry.countField]);
+      if (Number.isFinite(n) && n >= 0) return Math.min(n, PROBE_CAP);
+    }
+    let n = 0;
+    while (n < PROBE_CAP) {
+      const idx = n + 1;
+      const present = Object.keys(entry.cols).some(
+        col => flat[buildName(entry.pattern,
+                              { idx, col: fieldSegment(entry, col) })] !== undefined
+      );
+      if (!present) break;
+      n = idx;
+    }
+    return n;
+  }
+
   // Carte plate → opérations d'écriture, une par table.
   // Forme : [{ table, kind, rows: [...] }]
   function dispatch(flat, pageId) {
@@ -86,6 +112,19 @@
           row[col] = toDb(flat[col], type);
         }
         ops.push({ table, kind: 'one', rows: [row] });
+      }
+      if (entry.kind === 'many') {
+        const n = countInstances(flat, entry);
+        const rows = [];
+        for (let idx = 1; idx <= n; idx++) {
+          const row = { idx };
+          for (const [col, type] of Object.entries(entry.cols)) {
+            const seg = fieldSegment(entry, col);
+            row[col] = toDb(flat[buildName(entry.pattern, { idx, col: seg })], type);
+          }
+          rows.push(row);
+        }
+        ops.push({ table, kind: 'many', rows, deleteBeyondIdx: n });
       }
     }
     return ops;
@@ -106,6 +145,17 @@
           const v = fromDb(row[col], type);
           if (v !== undefined) flat[col] = v;
         }
+      }
+      if (entry.kind === 'many') {
+        for (const row of rows) {
+          for (const [col, type] of Object.entries(entry.cols)) {
+            const v = fromDb(row[col], type);
+            if (v === undefined) continue;
+            flat[buildName(entry.pattern,
+              { idx: row.idx, col: fieldSegment(entry, col) })] = v;
+          }
+        }
+        if (entry.countField) flat[entry.countField] = String(rows.length);
       }
     }
     return flat;
