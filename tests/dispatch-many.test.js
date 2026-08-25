@@ -57,3 +57,12 @@ test('aller-retour sur une section répétable', () => {
   assert.strictEqual(Number(back.dryer_2_temp_max), 210);
   assert.strictEqual(back.dryer_2_residence_unit, 'sec');
 });
+
+test('le compteur est reconstruit depuis les lignes, pas depuis une colonne', () => {
+  const { hydrate } = require('../docs/db.js');
+  const rows = {
+    press_dryer_section: [{ comments: '' }],
+    dryers: [{ idx: 1, main_type: 'single' }, { idx: 2, main_type: 'three' }],
+  };
+  assert.strictEqual(hydrate(rows, 5).dryer_count, '2');
+});

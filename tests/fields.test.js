@@ -23,3 +23,18 @@ test('toute entrée du manifeste déclare kind, page et cols', () => {
     assert.ok(Object.keys(e.cols).length > 0, `${name}: cols vide`);
   }
 });
+
+test('aucun compteur d’instances n’est stocke en colonne', () => {
+  // Un compteur est derivable de COUNT(*). Le stocker cree une seconde source
+  // de verite qui peut deriver de la premiere : deux tables de la meme page
+  // ecrivaient alors la meme cle a l'hydratation, et l'ordre de declaration
+  // dans le manifeste decidait silencieusement laquelle gagnait.
+  const counters = new Set(Object.values(SCHEMA)
+    .map(e => e.countField).filter(Boolean));
+  for (const [name, e] of Object.entries(SCHEMA)) {
+    for (const col of Object.keys(e.cols)) {
+      assert.ok(!counters.has(col),
+        `${name}.${col} est un compteur : le declarer en countField, pas en colonne`);
+    }
+  }
+});

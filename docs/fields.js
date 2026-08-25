@@ -31,7 +31,10 @@
 
     press_dryer_section: {
       kind: 'one', page: 5,
-      cols: { dryer_count: 'int', press_count: 'int', comments: 'text' },
+      // Pas de dryer_count ni press_count : un compteur derivable de COUNT(*)
+      // n'a pas a occuper une colonne. Il est declare en countField sur la
+      // section repetable, et hydrate depuis le nombre de lignes rendues.
+      cols: { comments: 'text' },
     },
 
     dryers: {
