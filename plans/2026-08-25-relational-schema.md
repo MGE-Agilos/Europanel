@@ -263,6 +263,31 @@ test('toDb traite la case à cocher : "on" vaut true, absent vaut false', () => 
   assert.strictEqual(toDb('', 'bool'), false);
 });
 
+test('toDb ne confond pas des espaces avec un zero', () => {
+  // Number('  ') vaut 0 : sans trim, une absence de mesure deviendrait
+  // une mesure de zero, ce qui n'est pas la meme affirmation.
+  assert.strictEqual(toDb('   ', 'num'), null);
+  assert.strictEqual(toDb('	', 'int'), null);
+  assert.strictEqual(toDb('   ', 'text'), null);
+});
+
+test('toDb preserve le zero, qui est une mesure valide', () => {
+  assert.strictEqual(toDb('0', 'num'), 0);
+  assert.strictEqual(toDb('0', 'int'), 0);
+  assert.strictEqual(toDb('0.0', 'num'), 0);
+});
+
+test('toDb arrondit les colonnes entieres', () => {
+  // Les colonnes 'int' sont des SMALLINT : une fraction ferait echouer
+  // l'insertion PostgreSQL.
+  assert.strictEqual(toDb('2019.0', 'int'), 2019);
+  assert.strictEqual(toDb('2.6', 'int'), 3);
+});
+
+test('toDb ne rogne pas le texte saisi', () => {
+  assert.strictEqual(toDb(' Dupont ', 'text'), ' Dupont ');
+});
+
 test('fromDb rend la chaîne vide pour null', () => {
   assert.strictEqual(fromDb(null, 'text'), '');
   assert.strictEqual(fromDb(null, 'num'), '');
@@ -313,11 +338,24 @@ Expected: FAIL — `Cannot find module '../docs/db.js'`
   // ce qui doit produire false et non null.
   function toDb(value, type) {
     if (type === 'bool') return value === 'on';
-    if (value === undefined || value === null || value === '') return null;
+    if (value === undefined || value === null) return null;
+
+    // Number('  ') vaut 0 en JavaScript. Sans ce trim, un champ ne contenant
+    // que des espaces serait enregistre comme une mesure de zero au lieu d'une
+    // absence de mesure. Dans un jeu de donnees d'emissions, les deux sont des
+    // affirmations differentes et partent dans les moyennes sectorielles.
+    const trimmed = String(value).trim();
+    if (trimmed === '') return null;
+
     if (type === 'num' || type === 'int') {
-      const n = Number(value);
-      return Number.isFinite(n) ? n : null;
+      const n = Number(trimmed);
+      if (!Number.isFinite(n)) return null;
+      // Les colonnes 'int' sont des SMALLINT (annees, compteurs) : une valeur
+      // fractionnaire ferait echouer l'insertion cote PostgreSQL.
+      return type === 'int' ? Math.round(n) : n;
     }
+    // Le texte est conserve tel quel : ce n'est pas a la couche de stockage
+    // de reecrire ce que l'operateur a saisi.
     return String(value);
   }
 
@@ -337,7 +375,7 @@ Expected: FAIL — `Cannot find module '../docs/db.js'`
 - [ ] **Step 4: Lancer les tests et vérifier qu'ils passent**
 
 Run: `npm test`
-Expected: PASS — 11 tests
+Expected: PASS — 15 tests
 
 - [ ] **Step 5: Commit**
 
