@@ -127,6 +127,27 @@ CREATE POLICY "ep_submission_pages_all" ON europanel.submission_pages
 CREATE POLICY "ep_audit_log_insert" ON europanel.audit_log
   FOR INSERT TO authenticated WITH CHECK (true);
 
+-- ─── Privilèges du noyau ──────────────────────────────────────────────
+-- Même motif que pour les tables générées (voir grantsDdl) : des GRANT
+-- explicites, indépendants de l'héritage par rôle d'ALTER DEFAULT
+-- PRIVILEGES. Référentiels en lecture seule pour authenticated ; journal
+-- en lecture + insertion seule, pour rester append-only au niveau des
+-- privilèges et non seulement au niveau des politiques.
+GRANT SELECT ON europanel.ref_lists TO authenticated;
+GRANT ALL ON europanel.ref_lists TO service_role;
+
+GRANT SELECT ON europanel.plants TO authenticated;
+GRANT ALL ON europanel.plants TO service_role;
+
+GRANT SELECT ON europanel.cycles TO authenticated;
+GRANT ALL ON europanel.cycles TO service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.submission_pages TO authenticated;
+GRANT ALL ON europanel.submission_pages TO service_role;
+
+GRANT SELECT, INSERT ON europanel.audit_log TO authenticated;
+GRANT ALL ON europanel.audit_log TO service_role;
+
 -- ▲▲▲ SECTION ÉCRITE À LA MAIN — fin ▲▲▲
 
 
@@ -156,6 +177,9 @@ CREATE TABLE IF NOT EXISTS europanel.contacts (
   twg_ngo_telephone    TEXT
 );
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.contacts TO authenticated;
+GRANT ALL ON europanel.contacts TO service_role;
+
 ALTER TABLE europanel.contacts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_contacts_select" ON europanel.contacts
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -177,6 +201,9 @@ CREATE TABLE IF NOT EXISTS europanel.general_info (
   ref_year            SMALLINT,
   comments            TEXT
 );
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.general_info TO authenticated;
+GRANT ALL ON europanel.general_info TO service_role;
 
 ALTER TABLE europanel.general_info ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_general_info_select" ON europanel.general_info
@@ -203,6 +230,9 @@ CREATE TABLE IF NOT EXISTS europanel.plant_products (
 CREATE INDEX IF NOT EXISTS idx_ep_plant_products_submission_id
   ON europanel.plant_products(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.plant_products TO authenticated;
+GRANT ALL ON europanel.plant_products TO service_role;
+
 ALTER TABLE europanel.plant_products ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_plant_products_select" ON europanel.plant_products
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -228,6 +258,9 @@ CREATE TABLE IF NOT EXISTS europanel.site_activities (
 CREATE INDEX IF NOT EXISTS idx_ep_site_activities_submission_id
   ON europanel.site_activities(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.site_activities TO authenticated;
+GRANT ALL ON europanel.site_activities TO service_role;
+
 ALTER TABLE europanel.site_activities ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_site_activities_select" ON europanel.site_activities
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -251,6 +284,9 @@ CREATE TABLE IF NOT EXISTS europanel.site_activity_units (
 CREATE INDEX IF NOT EXISTS idx_ep_site_activity_units_submission_id
   ON europanel.site_activity_units(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.site_activity_units TO authenticated;
+GRANT ALL ON europanel.site_activity_units TO service_role;
+
 ALTER TABLE europanel.site_activity_units ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_site_activity_units_select" ON europanel.site_activity_units
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -266,6 +302,9 @@ CREATE TABLE IF NOT EXISTS europanel.site_activity_other_specify (
   submission_id            BIGINT PRIMARY KEY REFERENCES europanel.submissions(id) ON DELETE CASCADE,
   act_other_specify_label  TEXT
 );
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.site_activity_other_specify TO authenticated;
+GRANT ALL ON europanel.site_activity_other_specify TO service_role;
 
 ALTER TABLE europanel.site_activity_other_specify ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_site_activity_other_specify_select" ON europanel.site_activity_other_specify
@@ -304,6 +343,9 @@ CREATE TABLE IF NOT EXISTS europanel.plant_layout_section (
   s25_comments      TEXT
 );
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.plant_layout_section TO authenticated;
+GRANT ALL ON europanel.plant_layout_section TO service_role;
+
 ALTER TABLE europanel.plant_layout_section ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_plant_layout_section_select" ON europanel.plant_layout_section
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -328,6 +370,9 @@ CREATE TABLE IF NOT EXISTS europanel.raw_material_storage (
 );
 CREATE INDEX IF NOT EXISTS idx_ep_raw_material_storage_submission_id
   ON europanel.raw_material_storage(submission_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.raw_material_storage TO authenticated;
+GRANT ALL ON europanel.raw_material_storage TO service_role;
 
 ALTER TABLE europanel.raw_material_storage ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_raw_material_storage_select" ON europanel.raw_material_storage
@@ -360,6 +405,9 @@ CREATE TABLE IF NOT EXISTS europanel.wood_prep_operations (
 CREATE INDEX IF NOT EXISTS idx_ep_wood_prep_operations_submission_id
   ON europanel.wood_prep_operations(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.wood_prep_operations TO authenticated;
+GRANT ALL ON europanel.wood_prep_operations TO service_role;
+
 ALTER TABLE europanel.wood_prep_operations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_wood_prep_operations_select" ON europanel.wood_prep_operations
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -383,6 +431,9 @@ CREATE TABLE IF NOT EXISTS europanel.wood_prep_param_comments (
 CREATE INDEX IF NOT EXISTS idx_ep_wood_prep_param_comments_submission_id
   ON europanel.wood_prep_param_comments(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.wood_prep_param_comments TO authenticated;
+GRANT ALL ON europanel.wood_prep_param_comments TO service_role;
+
 ALTER TABLE europanel.wood_prep_param_comments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_wood_prep_param_comments_select" ON europanel.wood_prep_param_comments
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -399,6 +450,9 @@ CREATE TABLE IF NOT EXISTS europanel.raw_materials_section (
   ref_year       SMALLINT,
   s32_comments   TEXT
 );
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.raw_materials_section TO authenticated;
+GRANT ALL ON europanel.raw_materials_section TO service_role;
 
 ALTER TABLE europanel.raw_materials_section ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_raw_materials_section_select" ON europanel.raw_materials_section
@@ -425,6 +479,9 @@ CREATE TABLE IF NOT EXISTS europanel.raw_materials (
 CREATE INDEX IF NOT EXISTS idx_ep_raw_materials_submission_id
   ON europanel.raw_materials(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.raw_materials TO authenticated;
+GRANT ALL ON europanel.raw_materials TO service_role;
+
 ALTER TABLE europanel.raw_materials ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_raw_materials_select" ON europanel.raw_materials
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -447,6 +504,9 @@ CREATE TABLE IF NOT EXISTS europanel.raw_material_specify (
 );
 CREATE INDEX IF NOT EXISTS idx_ep_raw_material_specify_submission_id
   ON europanel.raw_material_specify(submission_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.raw_material_specify TO authenticated;
+GRANT ALL ON europanel.raw_material_specify TO service_role;
 
 ALTER TABLE europanel.raw_material_specify ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_raw_material_specify_select" ON europanel.raw_material_specify
@@ -471,6 +531,9 @@ CREATE TABLE IF NOT EXISTS europanel.resins (
 CREATE INDEX IF NOT EXISTS idx_ep_resins_submission_id
   ON europanel.resins(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.resins TO authenticated;
+GRANT ALL ON europanel.resins TO service_role;
+
 ALTER TABLE europanel.resins ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_resins_select" ON europanel.resins
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -492,6 +555,9 @@ CREATE TABLE IF NOT EXISTS europanel.hardeners (
 );
 CREATE INDEX IF NOT EXISTS idx_ep_hardeners_submission_id
   ON europanel.hardeners(submission_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.hardeners TO authenticated;
+GRANT ALL ON europanel.hardeners TO service_role;
 
 ALTER TABLE europanel.hardeners ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_hardeners_select" ON europanel.hardeners
@@ -517,6 +583,9 @@ CREATE TABLE IF NOT EXISTS europanel.additives (
 CREATE INDEX IF NOT EXISTS idx_ep_additives_submission_id
   ON europanel.additives(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.additives TO authenticated;
+GRANT ALL ON europanel.additives TO service_role;
+
 ALTER TABLE europanel.additives ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_additives_select" ON europanel.additives
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -541,6 +610,9 @@ CREATE TABLE IF NOT EXISTS europanel.energy_section (
   s43_warm_startups     SMALLINT,
   s43_maintenance_desc  TEXT
 );
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.energy_section TO authenticated;
+GRANT ALL ON europanel.energy_section TO service_role;
 
 ALTER TABLE europanel.energy_section ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_energy_section_select" ON europanel.energy_section
@@ -579,6 +651,9 @@ CREATE TABLE IF NOT EXISTS europanel.combustion_units (
 CREATE INDEX IF NOT EXISTS idx_ep_combustion_units_submission_id
   ON europanel.combustion_units(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.combustion_units TO authenticated;
+GRANT ALL ON europanel.combustion_units TO service_role;
+
 ALTER TABLE europanel.combustion_units ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_combustion_units_select" ON europanel.combustion_units
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -603,6 +678,9 @@ CREATE TABLE IF NOT EXISTS europanel.combustion_unit_fuels (
 CREATE INDEX IF NOT EXISTS idx_ep_combustion_unit_fuels_combustion_units_id
   ON europanel.combustion_unit_fuels(combustion_units_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.combustion_unit_fuels TO authenticated;
+GRANT ALL ON europanel.combustion_unit_fuels TO service_role;
+
 ALTER TABLE europanel.combustion_unit_fuels ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_combustion_unit_fuels_select" ON europanel.combustion_unit_fuels
   FOR SELECT TO authenticated USING (combustion_units_id IN (SELECT id FROM europanel.combustion_units WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
@@ -618,6 +696,9 @@ CREATE TABLE IF NOT EXISTS europanel.press_dryer_section (
   submission_id  BIGINT PRIMARY KEY REFERENCES europanel.submissions(id) ON DELETE CASCADE,
   comments       TEXT
 );
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.press_dryer_section TO authenticated;
+GRANT ALL ON europanel.press_dryer_section TO service_role;
 
 ALTER TABLE europanel.press_dryer_section ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_press_dryer_section_select" ON europanel.press_dryer_section
@@ -655,6 +736,9 @@ CREATE TABLE IF NOT EXISTS europanel.dryers (
 CREATE INDEX IF NOT EXISTS idx_ep_dryers_submission_id
   ON europanel.dryers(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.dryers TO authenticated;
+GRANT ALL ON europanel.dryers TO service_role;
+
 ALTER TABLE europanel.dryers ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_dryers_select" ON europanel.dryers
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -686,6 +770,9 @@ CREATE TABLE IF NOT EXISTS europanel.presses (
 CREATE INDEX IF NOT EXISTS idx_ep_presses_submission_id
   ON europanel.presses(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.presses TO authenticated;
+GRANT ALL ON europanel.presses TO service_role;
+
 ALTER TABLE europanel.presses ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_presses_select" ON europanel.presses
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -707,6 +794,9 @@ CREATE TABLE IF NOT EXISTS europanel.dust_section (
   s62_control_measures     TEXT,
   s62_comments             TEXT
 );
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.dust_section TO authenticated;
+GRANT ALL ON europanel.dust_section TO service_role;
 
 ALTER TABLE europanel.dust_section ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_dust_section_select" ON europanel.dust_section
@@ -734,6 +824,9 @@ CREATE TABLE IF NOT EXISTS europanel.abatement_techniques (
 CREATE INDEX IF NOT EXISTS idx_ep_abatement_techniques_submission_id
   ON europanel.abatement_techniques(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.abatement_techniques TO authenticated;
+GRANT ALL ON europanel.abatement_techniques TO service_role;
+
 ALTER TABLE europanel.abatement_techniques ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_abatement_techniques_select" ON europanel.abatement_techniques
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -758,6 +851,9 @@ CREATE TABLE IF NOT EXISTS europanel.abatement_technique_sources (
 CREATE INDEX IF NOT EXISTS idx_ep_abatement_technique_sources_abatement_techniques_id
   ON europanel.abatement_technique_sources(abatement_techniques_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.abatement_technique_sources TO authenticated;
+GRANT ALL ON europanel.abatement_technique_sources TO service_role;
+
 ALTER TABLE europanel.abatement_technique_sources ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_abatement_technique_sources_select" ON europanel.abatement_technique_sources
   FOR SELECT TO authenticated USING (abatement_techniques_id IN (SELECT id FROM europanel.abatement_techniques WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
@@ -781,6 +877,9 @@ CREATE TABLE IF NOT EXISTS europanel.abatement_technique_flows (
 );
 CREATE INDEX IF NOT EXISTS idx_ep_abatement_technique_flows_abatement_techniques_id
   ON europanel.abatement_technique_flows(abatement_techniques_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.abatement_technique_flows TO authenticated;
+GRANT ALL ON europanel.abatement_technique_flows TO service_role;
 
 ALTER TABLE europanel.abatement_technique_flows ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_abatement_technique_flows_select" ON europanel.abatement_technique_flows
@@ -819,6 +918,9 @@ CREATE TABLE IF NOT EXISTS europanel.emission_points (
 CREATE INDEX IF NOT EXISTS idx_ep_emission_points_submission_id
   ON europanel.emission_points(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.emission_points TO authenticated;
+GRANT ALL ON europanel.emission_points TO service_role;
+
 ALTER TABLE europanel.emission_points ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_emission_points_select" ON europanel.emission_points
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -847,6 +949,9 @@ CREATE TABLE IF NOT EXISTS europanel.emission_point_pollutants (
 CREATE INDEX IF NOT EXISTS idx_ep_emission_point_pollutants_emission_points_id
   ON europanel.emission_point_pollutants(emission_points_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.emission_point_pollutants TO authenticated;
+GRANT ALL ON europanel.emission_point_pollutants TO service_role;
+
 ALTER TABLE europanel.emission_point_pollutants ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_emission_point_pollutants_select" ON europanel.emission_point_pollutants
   FOR SELECT TO authenticated USING (emission_points_id IN (SELECT id FROM europanel.emission_points WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
@@ -871,6 +976,9 @@ CREATE TABLE IF NOT EXISTS europanel.waste_water_discharges (
 );
 CREATE INDEX IF NOT EXISTS idx_ep_waste_water_discharges_submission_id
   ON europanel.waste_water_discharges(submission_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.waste_water_discharges TO authenticated;
+GRANT ALL ON europanel.waste_water_discharges TO service_role;
 
 ALTER TABLE europanel.waste_water_discharges ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_waste_water_discharges_select" ON europanel.waste_water_discharges
@@ -898,6 +1006,9 @@ CREATE TABLE IF NOT EXISTS europanel.waste_water_pollutants (
 CREATE INDEX IF NOT EXISTS idx_ep_waste_water_pollutants_waste_water_discharges_id
   ON europanel.waste_water_pollutants(waste_water_discharges_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.waste_water_pollutants TO authenticated;
+GRANT ALL ON europanel.waste_water_pollutants TO service_role;
+
 ALTER TABLE europanel.waste_water_pollutants ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_waste_water_pollutants_select" ON europanel.waste_water_pollutants
   FOR SELECT TO authenticated USING (waste_water_discharges_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
@@ -922,6 +1033,9 @@ CREATE TABLE IF NOT EXISTS europanel.waste_water_sources (
 CREATE INDEX IF NOT EXISTS idx_ep_waste_water_sources_waste_water_discharges_id
   ON europanel.waste_water_sources(waste_water_discharges_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.waste_water_sources TO authenticated;
+GRANT ALL ON europanel.waste_water_sources TO service_role;
+
 ALTER TABLE europanel.waste_water_sources ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_waste_water_sources_select" ON europanel.waste_water_sources
   FOR SELECT TO authenticated USING (waste_water_discharges_id IN (SELECT id FROM europanel.waste_water_discharges WHERE submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid())));
@@ -938,6 +1052,9 @@ CREATE TABLE IF NOT EXISTS europanel.waste_section (
   waste_comments        TEXT,
   waste_bat_techniques  TEXT
 );
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.waste_section TO authenticated;
+GRANT ALL ON europanel.waste_section TO service_role;
 
 ALTER TABLE europanel.waste_section ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_waste_section_select" ON europanel.waste_section
@@ -964,6 +1081,9 @@ CREATE TABLE IF NOT EXISTS europanel.waste_streams (
 CREATE INDEX IF NOT EXISTS idx_ep_waste_streams_submission_id
   ON europanel.waste_streams(submission_id);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.waste_streams TO authenticated;
+GRANT ALL ON europanel.waste_streams TO service_role;
+
 ALTER TABLE europanel.waste_streams ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_waste_streams_select" ON europanel.waste_streams
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -988,6 +1108,9 @@ CREATE TABLE IF NOT EXISTS europanel.water_consumption (
   wc_bat_techniques     TEXT,
   wc_comments           TEXT
 );
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.water_consumption TO authenticated;
+GRANT ALL ON europanel.water_consumption TO service_role;
 
 ALTER TABLE europanel.water_consumption ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_water_consumption_select" ON europanel.water_consumption
@@ -1030,6 +1153,9 @@ CREATE TABLE IF NOT EXISTS europanel.bat_candidate (
   bat_tech_comments        TEXT
 );
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.bat_candidate TO authenticated;
+GRANT ALL ON europanel.bat_candidate TO service_role;
+
 ALTER TABLE europanel.bat_candidate ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "ep_bat_candidate_select" ON europanel.bat_candidate
   FOR SELECT TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
@@ -1039,3 +1165,10 @@ CREATE POLICY "ep_bat_candidate_update" ON europanel.bat_candidate
   FOR UPDATE TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
 CREATE POLICY "ep_bat_candidate_delete" ON europanel.bat_candidate
   FOR DELETE TO authenticated USING (submission_id IN (SELECT id FROM europanel.submissions WHERE user_id = auth.uid()));
+
+-- ══════════════════════════════════════════════════════════════════════
+--  Privilèges sur les séquences (BIGSERIAL) : sans ce GRANT, un INSERT
+--  par authenticated échoue à l'obtention de la valeur suivante, même
+--  si la table elle-même lui est accessible.
+-- ══════════════════════════════════════════════════════════════════════
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA europanel TO authenticated, service_role;

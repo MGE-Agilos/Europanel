@@ -220,6 +220,35 @@ test('le prédicat RLS remonte jusqu\'à submissions.user_id', () => {
   }
 });
 
+test('chaque table créée porte au moins un GRANT, et les séquences sont accordées une fois', () => {
+  for (const table of Object.keys(SCHEMA)) {
+    assert.match(sql, new RegExp(`GRANT [\\w, ]+ ON europanel\\.${table} TO `),
+      `${table}: aucun GRANT`);
+  }
+  const core = ['plants', 'cycles', 'ref_lists', 'submission_pages', 'audit_log'];
+  for (const table of core) {
+    assert.match(sql, new RegExp(`GRANT [\\w, ]+ ON europanel\\.${table} TO `),
+      `${table}: aucun GRANT (noyau)`);
+  }
+  // Lecture seule pour authenticated sur les référentiels ; pas d'écriture.
+  for (const t of ['ref_lists', 'plants', 'cycles']) {
+    assert.ok(sql.includes(`GRANT SELECT ON europanel.${t} TO authenticated;`),
+      `${t}: doit être lecture seule pour authenticated`);
+    assert.ok(!new RegExp(`GRANT [^\\n]*INSERT[^\\n]* ON europanel\\.${t} TO authenticated`)
+      .test(sql), `${t}: ne doit pas accorder l'écriture à authenticated`);
+  }
+  // Append-only : SELECT + INSERT seulement pour authenticated.
+  assert.ok(sql.includes('GRANT SELECT, INSERT ON europanel.audit_log TO authenticated;'));
+  // service_role a toujours ALL, quelle que soit la table.
+  for (const table of [...Object.keys(SCHEMA), ...core]) {
+    assert.ok(sql.includes(`GRANT ALL ON europanel.${table} TO service_role;`),
+      `${table}: service_role doit avoir ALL`);
+  }
+  assert.strictEqual(
+    (sql.match(/GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA europanel TO authenticated, service_role;/g) || []).length,
+    1, 'le GRANT sur les séquences doit apparaître exactement une fois');
+});
+
 test('le noyau porte RLS : référentiels en lecture seule, journal en insertion seule', () => {
   for (const t of ['plants', 'cycles', 'ref_lists', 'submission_pages', 'audit_log']) {
     assert.ok(sql.includes(`ALTER TABLE europanel.${t}`) &&

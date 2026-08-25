@@ -133,6 +133,24 @@ function indexDdl(table, entry) {
          `  ON europanel.${table}(${col});`;
 }
 
+/* ── Privilèges ───────────────────────────────────────────────────────────
+   001_schema.sql accorde l'accès via ALTER DEFAULT PRIVILEGES, qui ne vaut
+   que pour les tables créées ensuite PAR LE MÊME RÔLE. Si 002 est appliqué
+   sous un rôle différent — un accident plausible quand une migration passe
+   par l'éditeur SQL de Supabase et l'autre par la CLI — les tables créées
+   ici n'héritent d'aucun privilège, et les politiques RLS qui suivent
+   portent sur des tables qu'authenticated ne peut même pas lire : chaque
+   requête échoue par erreur de permission plutôt que de renvoyer un
+   ensemble vide. D'où des GRANT explicites, table par table, plutôt que de
+   compter sur l'héritage.
+   ────────────────────────────────────────────────────────────────────────── */
+function grantsDdl(table) {
+  return [
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.${table} TO authenticated;`,
+    `GRANT ALL ON europanel.${table} TO service_role;`,
+  ].join('\n');
+}
+
 /* ── Politiques RLS ───────────────────────────────────────────────────── */
 
 function policiesDdl(table, entry) {
@@ -273,6 +291,27 @@ CREATE POLICY "ep_submission_pages_all" ON europanel.submission_pages
 CREATE POLICY "ep_audit_log_insert" ON europanel.audit_log
   FOR INSERT TO authenticated WITH CHECK (true);
 
+-- ─── Privilèges du noyau ──────────────────────────────────────────────
+-- Même motif que pour les tables générées (voir grantsDdl) : des GRANT
+-- explicites, indépendants de l'héritage par rôle d'ALTER DEFAULT
+-- PRIVILEGES. Référentiels en lecture seule pour authenticated ; journal
+-- en lecture + insertion seule, pour rester append-only au niveau des
+-- privilèges et non seulement au niveau des politiques.
+GRANT SELECT ON europanel.ref_lists TO authenticated;
+GRANT ALL ON europanel.ref_lists TO service_role;
+
+GRANT SELECT ON europanel.plants TO authenticated;
+GRANT ALL ON europanel.plants TO service_role;
+
+GRANT SELECT ON europanel.cycles TO authenticated;
+GRANT ALL ON europanel.cycles TO service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON europanel.submission_pages TO authenticated;
+GRANT ALL ON europanel.submission_pages TO service_role;
+
+GRANT SELECT, INSERT ON europanel.audit_log TO authenticated;
+GRANT ALL ON europanel.audit_log TO service_role;
+
 -- ▲▲▲ SECTION ÉCRITE À LA MAIN — fin ▲▲▲
 `;
 
@@ -331,8 +370,17 @@ export function buildDdl() {
       tableDdl(table, entry));
     const idx = indexDdl(table, entry);
     if (idx) parts.push(idx);
-    parts.push('', policiesDdl(table, entry), '');
+    parts.push('', grantsDdl(table), '', policiesDdl(table, entry), '');
   }
+
+  parts.push(
+    '-- ══════════════════════════════════════════════════════════════════════',
+    '--  Privilèges sur les séquences (BIGSERIAL) : sans ce GRANT, un INSERT',
+    '--  par authenticated échoue à l\'obtention de la valeur suivante, même',
+    '--  si la table elle-même lui est accessible.',
+    '-- ══════════════════════════════════════════════════════════════════════',
+    'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA europanel TO authenticated, service_role;',
+    '');
 
   return parts.join('\n');
 }
