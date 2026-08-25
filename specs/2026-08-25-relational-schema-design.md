@@ -105,7 +105,7 @@ les conséquences d'une erreur, il ne la détecte pas.
 | Section répétable | `idx SMALLINT NOT NULL` + `UNIQUE(parent_id, idx)` |
 | Groupe à clés fixes | `code TEXT NOT NULL` + `UNIQUE(parent_id, code)` |
 | Suppression | `ON DELETE CASCADE` en chaîne depuis `submissions` |
-| Horodatage | `updated_at TIMESTAMPTZ` + trigger, sur les tables 1:1 et racines |
+| Horodatage | `updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()` + trigger, sur **toutes** les tables |
 | Types | `NUMERIC` (mesures), `SMALLINT` (années, compteurs), `BOOLEAN` (oui/non), `TEXT` (libre et codes) |
 | Listes de valeurs | FK vers `ref_lists(list_code, code)`. **Pas de contrainte `CHECK`** |
 
@@ -116,6 +116,11 @@ les conséquences d'une erreur, il ne la détecte pas.
   à une liste de noms et de types.
 - **Tables enfants** : le nom de colonne est le segment `{col}` du motif, débarrassé
   du préfixe et de l'indice (`dryer_3_temp_max` → colonne `temp_max`).
+
+L'horodatage est posé uniformément, y compris sur les tables enfants, plutôt que sur
+les seules tables 1:1 et racines. Une asymétrie ici obligerait à se souvenir, pour
+chaque table, si elle porte la colonne — et la question se pose précisément au moment
+où l'on enquête sur une donnée douteuse.
 
 ### 3.2 Pourquoi pas de `CHECK` sur les listes
 
@@ -143,13 +148,20 @@ CREATE TABLE europanel.ref_lists (
 );
 ```
 
-Les tables enfants portent une colonne `list_code` **générée** et figée à la valeur
-de leur liste, ce qui permet une clé étrangère composite propre :
+Les tables enfants portent une colonne `list_code` figée à la valeur de leur liste,
+ce qui permet une clé étrangère composite propre :
 
 ```sql
-list_code TEXT GENERATED ALWAYS AS ('pollutants') STORED,
+list_code TEXT NOT NULL DEFAULT 'pollutants' CHECK (list_code = 'pollutants'),
 FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
 ```
+
+Une colonne `GENERATED ALWAYS AS ('pollutants') STORED` exprimerait la même contrainte
+plus élégamment, et est vraisemblablement valide dans une clé étrangère composite. Elle
+n'a pas été retenue parce qu'aucun PostgreSQL n'était disponible pour le vérifier, et
+que ce fichier est appliqué à la main sur un projet Supabase réel : une migration qui
+échoue à mi-parcours est une mauvaise façon d'apprendre la réponse. Le `CHECK` donne
+la même garantie sans poser la question.
 
 Le seed est produit depuis les tableaux JS par script, pas retapé à la main.
 
@@ -313,7 +325,9 @@ Codes : `energy`, `rawmat`, `water`, `emissions`, `primary_other`, `air`, `ww`,
 
 ### 4.4 Total
 
-7 noyau + 10 tables de page + 23 tables enfants = **40 tables**.
+7 noyau + 10 tables de page + 23 tables enfants = **40 tables**, dont 33 décrites
+par le manifeste et 5 écrites à la main dans le générateur (`companies` et
+`submissions` viennent de la migration `001`).
 
 Le manifeste en décrit 33 ; les 7 tables du noyau ne portent aucun champ de
 questionnaire et sont écrites à la main.
