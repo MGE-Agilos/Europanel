@@ -71,7 +71,12 @@
     // parent:true : ce sont des lignes de sous-titre, sans aucun input. Les
     // inclure creerait douze colonnes sans champ. D'ou 35 codes et non 37.
     pollutants: ['pm', 'so2', 'nox', 'co', 'nh3', 'hcho', 'nmvoc', 'toc', 'voc',
-                 'cvoc', 'terpene', 'org_acids'],
+                 'cvoc', 'terpene',
+                 'formic', 'acetic', 'propionic',
+                 'acetaldehyde', 'phenol', 'pmdi',
+                 'as', 'pb', 'cr', 'hcl', 'hf',
+                 'cd', 'co_hm', 'cr_hm', 'cu', 'hg', 'ni', 'sb', 'tl', 'v',
+                 'methanol', 'odour', 'others_1', 'pcdd'],
 
     /* ── page 8 ─────────────────────────────────────────────────────── */
     ww_pollutants: ['flow', 'ph', 'tss', 'bod5', 'cod', 'toc', 'thc', 'total_n',
@@ -319,13 +324,21 @@
       cols: { val: 'num', comment: 'text' },
     },
 
+    /* ══ page 7 — Emission points ══════════════════════════════════════ */
+
     emission_points: {
       kind: 'many', page: 7, pattern: 'ep_{idx}_{col}', countField: 'ep_count',
       // Le champ HTML est ep_N_id ; la colonne ne peut pas s'appeler id,
       // deja pris par la cle primaire de substitution.
       aliases: { point_ref: 'id' },
       cols: {
-        point_ref: 'text', ref_year: 'int', refcond: 'text',
+        point_ref: 'text',
+        // 'text' et non 'int' : contrairement aux annees des pages 1 a 5,
+        // rendues en boutons radio, celle-ci est un input texte libre
+        // (placeholder « e.g. 2024 »). Une saisie « 2023/2024 » ou
+        // « 2024 (partiel) » serait mise a null par une colonne entiere.
+        ref_year: 'text',
+        refcond: 'text',
         waste_gas_desc: 'text', comments: 'text',
         cross_section: 'num', air_pressure: 'num', temp_dry: 'num', temp_wet: 'num',
         o2: 'num', co2: 'num', co_gas: 'num', inert: 'num', moisture: 'num',
@@ -348,6 +361,30 @@
         // valeurs a null sans avertissement.
         limit_val: 'text',
       },
+    },
+
+    /* ══ page 8 — Waste water ══════════════════════════════════════════ */
+
+    waste_water_discharges: {
+      kind: 'many', page: 8, pattern: 'ww_{idx}_{col}', countField: 'ww_count',
+      cols: {
+        discharge_id: 'text',
+        // Input texte libre, comme page 7 : voir emission_points.ref_year.
+        ref_year: 'text',
+        treated: 'text', wwtp_desc: 'text', sludge_fate: 'text',
+      },
+    },
+
+    waste_water_pollutants: {
+      kind: 'keyed', page: 8, parent: 'waste_water_discharges',
+      pattern: 'ww_{parent_idx}_poll_{code}_{col}', list: 'ww_pollutants',
+      cols: { conc: 'num', freq: 'text', pos: 'text', comments: 'text' },
+    },
+
+    waste_water_sources: {
+      kind: 'keyed', page: 8, parent: 'waste_water_discharges',
+      pattern: 'ww_{parent_idx}_src_{code}_{col}', list: 'ww_sources',
+      cols: { vol: 'num', comment: 'text' },
     },
   };
 
