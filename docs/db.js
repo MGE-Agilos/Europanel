@@ -39,5 +39,34 @@
     return String(value);
   }
 
-  return { toDb, fromDb, SCHEMA };
+  /* ── Construction des noms ────────────────────────────────────────── */
+
+  // Construit le nom de champ HTML attendu à partir d'un motif du manifeste.
+  // On construit plutôt qu'on n'analyse : 'rm_{code}_{col}' est ambigu à la
+  // lecture (où finit le code dans rm_ext_prod_res_specify ?) mais parfaitement
+  // déterministe à l'écriture, puisque codes et colonnes sont connus.
+  function buildName(pattern, parts) {
+    const missing = [];
+    const out = pattern.replace(/\{(idx|parent_idx|code|col)\}/g, (_, token) => {
+      const v = parts[token];
+      if (v === undefined || v === null) { missing.push(token); return ''; }
+      return String(v);
+    });
+    if (missing.length) {
+      throw new Error(
+        'buildName: jeton non resolu {' + missing.join('}, {') + '} dans « ' + pattern + ' »'
+      );
+    }
+    return out;
+  }
+
+  // Segment de nom de champ correspondant à une colonne.
+  // Sert aux colonnes qui ne peuvent pas porter le nom de leur champ :
+  // 'id' entrerait en collision avec la clé primaire de substitution,
+  // 'desc' est un mot réservé PostgreSQL.
+  function fieldSegment(entry, col) {
+    return (entry.aliases && entry.aliases[col]) || col;
+  }
+
+  return { toDb, fromDb, buildName, fieldSegment, SCHEMA };
 });
