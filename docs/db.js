@@ -114,6 +114,19 @@
     return n;
   }
 
+  function range(from, to) {
+    const out = [];
+    for (let i = from; i <= to; i++) out.push(i);
+    return out;
+  }
+
+  // Profondeur d'une table dans la chaine de parente (0 = rattachee a la soumission).
+  function depth(table) {
+    let d = 0, cur = SCHEMA[table];
+    while (cur && cur.parent) { d++; cur = SCHEMA[cur.parent]; }
+    return d;
+  }
+
   // Carte plate → opérations d'écriture, une par table.
   // Forme : [{ table, kind, rows: [...] }]
   function dispatch(flat, pageId) {
@@ -141,22 +154,33 @@
       }
       if (entry.kind === 'keyed') {
         const rows = [];
-        for (const code of LISTS[entry.list]) {
-          const row = { code };
-          let any = false;
-          for (const [col, type] of Object.entries(entry.cols)) {
-            const raw = flat[buildName(entry.pattern,
-                                       { code, col: fieldSegment(entry, col) })];
-            if (raw !== undefined && raw !== '') any = true;
-            row[col] = toDb(raw, type);
+        // Une table enfant itere sur les instances de son parent ; une table
+        // rattachee directement a la soumission n'a qu'une seule passe.
+        const parents = entry.parent
+          ? range(1, countInstances(flat, SCHEMA[entry.parent]))
+          : [null];
+
+        for (const parentIdx of parents) {
+          for (const code of LISTS[entry.list]) {
+            const parts = { code, parent_idx: parentIdx };
+            const row = parentIdx === null ? { code } : { code, parent_idx: parentIdx };
+            let any = false;
+            for (const [col, type] of Object.entries(entry.cols)) {
+              const raw = flat[buildName(entry.pattern,
+                Object.assign({ col: fieldSegment(entry, col) }, parts))];
+              if (raw !== undefined && raw !== '') any = true;
+              row[col] = toDb(raw, type);
+            }
+            // On n'ecrit une ligne que si au moins une colonne est renseignee,
+            // pour ne pas creer 37 lignes vides par point d'emission.
+            if (any) rows.push(row);
           }
-          // On n'ecrit une ligne que si au moins une colonne est renseignee,
-          // pour ne pas creer 37 lignes vides par point d'emission.
-          if (any) rows.push(row);
         }
         ops.push({ table, kind: 'keyed', rows });
       }
     }
+    // Les tables enfants ont besoin de la cle de leur parent : on les ecrit apres.
+    ops.sort((a, b) => depth(a.table) - depth(b.table));
     return ops;
   }
 
@@ -189,11 +213,13 @@
       }
       if (entry.kind === 'keyed') {
         for (const row of rows) {
+          const parts = { code: row.code };
+          if (entry.parent) parts.parent_idx = row.parent_idx;
           for (const [col, type] of Object.entries(entry.cols)) {
             const v = fromDb(row[col], type);
             if (v === undefined) continue;
             flat[buildName(entry.pattern,
-              { code: row.code, col: fieldSegment(entry, col) })] = v;
+              Object.assign({ col: fieldSegment(entry, col) }, parts))] = v;
           }
         }
       }

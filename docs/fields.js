@@ -20,6 +20,8 @@
   const LISTS = {
     raw_materials: ['roundwood', 'vir_forest', 'sawdust', 'ext_prod_res',
                     'ext_recycled', 'nonwood', 'other'],
+    pollutants: ['pm', 'so2', 'nox', 'co', 'nh3', 'hcho', 'nmvoc', 'toc', 'voc',
+                 'cvoc', 'terpene', 'org_acids'],
   };
 
   const SCHEMA = {
@@ -62,6 +64,29 @@
     raw_materials: {
       kind: 'keyed', page: 3, pattern: 'rm_{code}_{col}', list: 'raw_materials',
       cols: { specify: 'text', species: 'text', source: 'text' },
+    },
+
+    emission_points: {
+      kind: 'many', page: 7, pattern: 'ep_{idx}_{col}', countField: 'ep_count',
+      // Le champ HTML est ep_N_id ; la colonne ne peut pas s'appeler id,
+      // deja pris par la cle primaire de substitution.
+      aliases: { point_ref: 'id' },
+      cols: {
+        point_ref: 'text', ref_year: 'int', refcond: 'text',
+        waste_gas_desc: 'text', comments: 'text',
+        cross_section: 'num', air_pressure: 'num', temp_dry: 'num', temp_wet: 'num',
+        o2: 'num', co2: 'num', co_gas: 'num', inert: 'num', moisture: 'num',
+        density_std: 'num', flow_actual: 'num', flow_std: 'num',
+      },
+    },
+
+    emission_point_pollutants: {
+      kind: 'keyed', page: 7, parent: 'emission_points',
+      pattern: 'ep_{parent_idx}_poll_{code}_{col}', list: 'pollutants',
+      cols: {
+        conc: 'num', method: 'text', t_year: 'num',
+        short_term: 'text', short_val: 'num', limit_val: 'num',
+      },
     },
 
   };
