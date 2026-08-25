@@ -239,6 +239,11 @@
               { idx: row.idx, col: fieldSegment(entry, col) })] = v;
           }
         }
+        // Correct seulement si les idx des lignes sont contigus depuis 1 :
+        // c'est l'hypothese posee dans countInstances (l'interface renumerote
+        // a la suppression, donc pas de trous). Si elle etait violee, ce
+        // compte serait sous-estime et une instance a idx eleve deviendrait
+        // inatteignable pour le renderer, qui itere de 1 a ce compte.
         if (entry.countField) flat[entry.countField] = String(rows.length);
       }
       if (entry.kind === 'keyed') {
