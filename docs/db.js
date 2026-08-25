@@ -25,21 +25,21 @@
     if (value === undefined || value === null) return null;
 
     // Number('  ') vaut 0 en JavaScript. Sans ce trim, un champ ne contenant
-    // que des espaces serait enregistre comme une mesure de zero au lieu d'une
-    // absence de mesure. Dans un jeu de donnees d'emissions, les deux sont des
-    // affirmations differentes et partent dans les moyennes sectorielles.
+    // que des espaces serait enregistré comme une mesure de zéro au lieu d'une
+    // absence de mesure. Dans un jeu de données d'émissions, les deux sont des
+    // affirmations différentes et partent dans les moyennes sectorielles.
     const trimmed = String(value).trim();
     if (trimmed === '') return null;
 
     if (type === 'num' || type === 'int') {
       const n = Number(trimmed);
       if (!Number.isFinite(n)) return null;
-      // Les colonnes 'int' sont des SMALLINT (annees, compteurs) : une valeur
-      // fractionnaire ferait echouer l'insertion cote PostgreSQL.
+      // Les colonnes 'int' sont des SMALLINT (années, compteurs) : une valeur
+      // fractionnaire ferait échouer l'insertion côté PostgreSQL.
       return type === 'int' ? Math.round(n) : n;
     }
-    // Le texte est conserve tel quel : ce n'est pas a la couche de stockage
-    // de reecrire ce que l'operateur a saisi.
+    // Le texte est conservé tel quel : ce n'est pas à la couche de stockage
+    // de réécrire ce que l'opérateur a saisi.
     return String(value);
   }
 
@@ -150,12 +150,14 @@
   function dispatch(flat, pageId) {
     const ops = [];
     for (const [table, entry] of entriesForPage(pageId)) {
-      if (entry.kind === 'one') {
+      switch (entry.kind) {
+      case 'one': {
         const row = {};
         for (const [col, type] of Object.entries(entry.cols)) {
           row[col] = toDb(flat[col], type);
         }
         ops.push({ table, kind: 'one', rows: [row] });
+        break;
       }
       // Une instance repetable est un signal de presence donne par
       // l'operateur : il a ajoute un cinquieme secheur. Ce signal doit
@@ -169,7 +171,7 @@
       // D'ou l'asymetrie deliberee : 'many' ecrit les instances declarees
       // meme vides, 'keyed' n'ecrit que les codes renseignes. Ne pas
       // « harmoniser » les deux branches.
-      if (entry.kind === 'many') {
+      case 'many': {
         const n = countInstances(flat, entry);
         const rows = [];
         for (let idx = 1; idx <= n; idx++) {
@@ -181,8 +183,9 @@
           rows.push(row);
         }
         ops.push({ table, kind: 'many', rows, deleteBeyondIdx: n });
+        break;
       }
-      if (entry.kind === 'keyed') {
+      case 'keyed': {
         const rows = [];
         // Une table enfant itere sur les instances de son parent ; une table
         // rattachee directement a la soumission n'a qu'une seule passe.
@@ -207,6 +210,10 @@
           }
         }
         ops.push({ table, kind: 'keyed', rows });
+        break;
+      }
+      default:
+        throw new Error('kind inconnu : ' + entry.kind + ' (table ' + table + ')');
       }
     }
     // Les tables enfants ont besoin de la cle de leur parent : on les ecrit apres.
@@ -222,15 +229,17 @@
     const flat = {};
     for (const [table, entry] of entriesForPage(pageId)) {
       const rows = rowsByTable[table] || [];
-      if (entry.kind === 'one') {
+      switch (entry.kind) {
+      case 'one': {
         const row = rows[0];
         if (!row) continue;
         for (const [col, type] of Object.entries(entry.cols)) {
           const v = fromDb(row[col], type);
           if (v !== undefined) flat[col] = v;
         }
+        break;
       }
-      if (entry.kind === 'many') {
+      case 'many': {
         for (const row of rows) {
           for (const [col, type] of Object.entries(entry.cols)) {
             const v = fromDb(row[col], type);
@@ -245,8 +254,9 @@
         // compte serait sous-estime et une instance a idx eleve deviendrait
         // inatteignable pour le renderer, qui itere de 1 a ce compte.
         if (entry.countField) flat[entry.countField] = String(rows.length);
+        break;
       }
-      if (entry.kind === 'keyed') {
+      case 'keyed': {
         for (const row of rows) {
           const parts = { code: row.code };
           if (entry.parent) parts.parent_idx = row.parent_idx;
@@ -257,6 +267,10 @@
               Object.assign({ col: fieldSegment(entry, col) }, parts))] = v;
           }
         }
+        break;
+      }
+      default:
+        throw new Error('kind inconnu : ' + entry.kind + ' (table ' + table + ')');
       }
     }
     return flat;
