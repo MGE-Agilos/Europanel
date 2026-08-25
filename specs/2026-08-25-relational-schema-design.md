@@ -1,0 +1,454 @@
+# EuroPanel — Migration du stockage JSONB vers un schéma relationnel
+
+**Date :** 2026-08-25
+**Statut :** design validé, prêt pour le plan d'implémentation
+**Portée :** stockage des données du questionnaire WBP BREF
+
+---
+
+## 1. Contexte et motivation
+
+Le stockage actuel place l'intégralité des réponses d'une page dans une colonne
+`JSONB` unique (`europanel.page_data.data`), indexée par `(submission_id, page_id)`.
+Ce choix a permis de construire le questionnaire sans migration de schéma à chaque
+ajout de champ, mais il présente trois limites qui deviennent bloquantes :
+
+1. **Lecture analytique.** Qlik et tout outil tiers doivent parser du JSON et connaître
+   la convention de nommage interne pour extraire une valeur. Aucun typage n'est
+   disponible : une année, une concentration et un commentaire sont tous des chaînes.
+2. **Intégrité.** PostgreSQL ne peut valider ni les types, ni les valeurs autorisées,
+   ni les relations. Une faute de frappe dans un nom de champ crée silencieusement une
+   nouvelle clé plutôt que de lever une erreur.
+3. **Crédibilité contractuelle.** Les engagements pris auprès d'EPF (portabilité,
+   export structuré, reprise par un tiers) reposent sur un modèle lisible sans
+   l'application. Un dump JSONB satisfait la lettre de l'engagement, pas son esprit.
+
+**Décision :** le JSONB disparaît du chemin d'écriture. Le webform écrit directement
+dans des tables métier typées, une colonne par champ.
+
+---
+
+## 2. Principe directeur : la carte plate reste l'interface
+
+Les treize fonctions de rendu (`docs/pages-0-6.js`, `docs/pages-7-12.js`, ~110 KB)
+lisent et écrivent une carte plate `{nom_champ: valeur}` via l'accesseur
+`v(data, 'contact_email')`. Le collecteur de `app.js` produit cette même carte en
+parcourant les attributs `[name]` du DOM.
+
+**Cette carte plate est conservée comme représentation en mémoire.** Un *dispatcher*
+la traduit vers les tables à l'écriture, et la reconstruit depuis les tables à la
+lecture.
+
+```
+renderers  ⇄  état plat {nom: valeur}  ⇄  dispatcher + manifeste  ⇄  ~42 tables
+ inchangé          inchangé                    NOUVEAU               NOUVEAU
+```
+
+Conséquence : **aucun renderer n'est modifié**. Le changement est circonscrit à
+`app.js` (chemins save/load), à un nouveau module `fields.js` (le manifeste), et au
+SQL. C'est ce qui rend la migration réalisable sans réécrire le questionnaire.
+
+---
+
+## 3. Conventions de schéma
+
+| Règle | Application |
+|---|---|
+| Schéma | `europanel` (inchangé) |
+| Clé primaire | `id BIGSERIAL` sur toutes les tables |
+| Table 1:1 de page | `submission_id BIGINT PRIMARY KEY REFERENCES submissions(id)` |
+| Section répétable | `idx SMALLINT NOT NULL` + `UNIQUE(parent_id, idx)` |
+| Groupe à clés fixes | `code TEXT NOT NULL` + `UNIQUE(parent_id, code)` |
+| Suppression | `ON DELETE CASCADE` en chaîne depuis `submissions` |
+| Horodatage | `updated_at TIMESTAMPTZ` + trigger, sur les tables 1:1 et racines |
+| Types | `NUMERIC` (mesures), `SMALLINT` (années, compteurs), `BOOLEAN` (oui/non), `TEXT` (libre et codes) |
+| Listes de valeurs | FK vers `ref_lists(list_code, code)`. **Pas de contrainte `CHECK`** |
+
+### 3.1 Nommage des colonnes
+
+- **Tables 1:1 de page** : le nom de colonne est **identique** au nom du champ HTML
+  (`contact_email`, `s43_cold_startups`). Le manifeste pour ces tables se réduit
+  à une liste de noms et de types.
+- **Tables enfants** : le nom de colonne est le segment `{col}` du motif, débarrassé
+  du préfixe et de l'indice (`dryer_3_temp_max` → colonne `temp_max`).
+
+### 3.2 Pourquoi pas de `CHECK` sur les listes
+
+Les listes de valeurs (37 polluants, 20 types de sécheurs, 14 types de résines…)
+évoluent à chaque révision BREF. Une contrainte `CHECK` imposerait une migration de
+schéma pour ajouter un polluant. Une clé étrangère vers `ref_lists` permet de l'ajouter
+par un `INSERT`. C'est la différence entre le tarif de 240 € par question annoncé à
+EPF et une intervention de plusieurs jours.
+
+### 3.3 Les listes de référence sont consolidées
+
+Le code JS contient 27 tableaux `const` de valeurs autorisées (`COUNTRIES`,
+`POLLUTANTS`, `DRYER_TYPES`, `WW_POLLS`…). Plutôt que 27 tables de référence, une
+table unique :
+
+```sql
+CREATE TABLE europanel.ref_lists (
+  list_code   TEXT    NOT NULL,   -- 'pollutants', 'dryer_types', 'countries'…
+  code        TEXT    NOT NULL,   -- 'nox', 'single', 'Belgium'
+  label       TEXT    NOT NULL,
+  unit        TEXT,
+  sort_order  SMALLINT NOT NULL DEFAULT 0,
+  active      BOOLEAN  NOT NULL DEFAULT TRUE,
+  PRIMARY KEY (list_code, code)
+);
+```
+
+Les tables enfants portent une colonne `list_code` **générée** et figée à la valeur
+de leur liste, ce qui permet une clé étrangère composite propre :
+
+```sql
+list_code TEXT GENERATED ALWAYS AS ('pollutants') STORED,
+FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)
+```
+
+Le seed est produit depuis les tableaux JS par script, pas retapé à la main.
+
+---
+
+## 4. Carte des tables
+
+### 4.1 Noyau (7 tables)
+
+| Table | Rôle |
+|---|---|
+| `companies` | Existante. Société membre. |
+| `plants` | **Nouvelle.** Installation. Une société peut en exploiter plusieurs. |
+| `cycles` | **Nouvelle.** Cycle de reporting : libellé, période de référence, dates d'ouverture et de clôture, statut. |
+| `submissions` | Étendue : `company_id`, `plant_id`, `cycle_id`, `status`, `submitted_at`, `approved_at`. |
+| `submission_pages` | Avancement par page : `(submission_id, page_id, status, saved_at)`. Remplace le rôle de suivi que tenait `page_data`. |
+| `ref_lists` | Listes de valeurs (§ 3.3). |
+| `audit_log` | **Nouvelle.** Journal append-only : acteur, action, table, enregistrement, champ, valeur avant/après, horodatage UTC. |
+
+`plants`, `cycles` et `audit_log` ne sont pas nécessaires au passage en tabulaire.
+Ils sont inclus parce que le schéma est refait de toute façon, et qu'ils correspondent
+aux engagements pris auprès d'EPF (soumission multi-sites, 3 à 4 cycles par an,
+historique d'audit complet). Les ajouter maintenant évite une seconde migration.
+**Cette itération crée les tables et les colonnes ; elle n'implémente pas les
+fonctionnalités de workflow associées.**
+
+### 4.2 Tables 1:1 de page (12 tables)
+
+| Page | Table | Colonnes |
+|---|---|---|
+| 0 | `contacts` | 17 — `contact_*` (6), `twg_ms_*` (6), `twg_ngo_*` (5) |
+| 1 | `general_info` | 6 — `plant_name`, `production_started`, `location_city`, `location_country`, `company`, `comments` |
+| 2 | `plant_layout` | 6 — `s21_comments`, `s22_comments`, `s23_present`, `s23_dust_method`, `s23_monitoring`, `s23_comments` |
+| 3 | `raw_materials_section` | 1 — `s32_comments` |
+| 4 | `energy_production` | 6 — `cu_count`, `s41_diagram_ref`, `s43_cold_startups`, `s43_warm_startups`, `s43_maintenance_desc`, `comments` |
+| 5 | `press_dryer_section` | 3 — `dryer_count`, `press_count`, `comments` |
+| 6 | `abatement_section` | 6 — `tech_count`, `s62_equip_desc`, `s62_dust_fate`, `s62_monitoring`, `s62_control_measures`, `s62_comments` |
+| 7 | `air_emissions_section` | 1 — `ep_count` |
+| 8 | `water_emissions_section` | 1 — `ww_count` |
+| 9 | `solid_residues_section` | 3 — `waste_row_count`, `waste_bat_techniques`, `waste_comments` |
+| 10 | `water_consumption` | 10 — `wc_process`, `wc_steam`, `wc_cooling`, `wc_sanitary`, `wc_other`, `wc_refining_total`, `wc_refining_recycled`, `wc_recycling_savings`, `wc_bat_techniques`, `wc_comments` |
+| 11 | `bat_candidate` | 17 — `bat_name`, `bat_plant_name`, `bat_tech_desc`, `bat_reference_plants`, `bat_install_year`, `bat_rd_level`, `bat_tech_comments`, `bat_env_*` (4), `bat_invest_cost`, `bat_oper_cost`, `bat_cost_effectiveness`, `bat_cross_media`, `bat_applicability`, `bat_references` |
+
+La page 12 (Review & Submit) ne porte aucun champ : elle ne produit pas de table.
+
+Les colonnes `*_count` (`cu_count`, `dryer_count`, `ep_count`…) sont conservées telles
+quelles. Elles sont redondantes avec `COUNT(*)` sur la table enfant, mais les renderers
+s'en servent pour reconstruire le nombre d'instances avant de lire les données. Elles
+sont recalculées à l'écriture depuis la table enfant, ce qui les rend cohérentes par
+construction.
+
+### 4.3 Tables enfants (23 tables)
+
+**Page 1**
+
+| Table | Type | Clé | Colonnes |
+|---|---|---|---|
+| `products` | répétable | `idx` | `type`, `addinfo`, `qty`, `unit` |
+| `other_activities` | à clés | `code` (11) | `label`, `capacity`, `unit` |
+
+Codes `other_activities` : `sawmill`, `glue`, `impreg_paper`, `paper_lam`,
+`other_value`, `combustion`, `incineration`, `ww_treatment`, `landfill`,
+`other_activities`, `other_specify`.
+
+**Page 2**
+
+| Table | Type | Clé | Colonnes |
+|---|---|---|---|
+| `wood_prep_operations` | à clés | `code` (3) | 9 — `process_desc`, `prod_t_batch`, `wood_dry`, `airflow`, `chan_air`, `chan_treated`, `emit_limit`, `dust_method`, `monitoring` |
+| `wood_prep_param_comments` | à clés | `code` (9) | `comments` |
+| `layout_sections` | à clés | `code` (3) | `description`, `dust_method`, `comments` |
+
+La matrice `s22_{col}_{row}` est transposée : trois lignes (`debark`, `chip`,
+`other_chip`) et neuf colonnes de paramètres. Les commentaires `s22_comments_{row}`
+sont indexés par paramètre et non par opération : ils vont dans une table distincte
+plutôt que d'être forcés dans la transposition.
+
+Codes `layout_sections` : `outdoor`, `indoor`, `silos`.
+
+**Page 3**
+
+| Table | Type | Clé | Colonnes |
+|---|---|---|---|
+| `raw_materials` | à clés | `code` (7) | `specify`, `species`, `source` |
+| `resins` | répétable | `idx` | `type`, `comments` |
+| `hardeners` | répétable | `idx` | `type`, `comments` |
+| `additives` | à clés | `code` (2) | `type`, `comments` |
+
+Codes `raw_materials` : `roundwood`, `vir_forest`, `sawdust`, `ext_prod_res`,
+`ext_recycled`, `nonwood`, `other`. Codes `additives` : `wax`, `other_add`.
+
+**Page 4**
+
+| Table | Type | Clé | Colonnes |
+|---|---|---|---|
+| `combustion_units` | répétable | `idx` | 10 — `thermal_input`, `energy_output`, `general_process`, `equip_type`, `install_year`, `boiler_detail`, `engine_ignition`, `hours_normal`, `hours_special`, `dual_fuel` |
+| `combustion_unit_fuels` | à clés, enfant de CU | `code` (7) | `pct`, `description` |
+| `combustion_unit_outputs` | répétable, enfant de CU | `idx` | `output_mw` |
+
+Codes `combustion_unit_fuels` : `prod_res`, `liquid`, `natgas`, `rec_ext`,
+`rec_waste`, `biomass`, `other`.
+
+**Page 5**
+
+| Table | Type | Clé | Colonnes |
+|---|---|---|---|
+| `dryers` | répétable | `idx` | 11 — `ref_year`, `main_type`, `system_desc`, `product`, `install_year`, `temp_min`, `temp_max`, `product_dried`, `drying_rate`, `residence_val`, `residence_unit` |
+| `presses` | répétable | `idx` | 7 — `ref_year`, `main_type`, `system_desc`, `product`, `install_year`, `output`, `factor` |
+
+**Page 6**
+
+| Table | Type | Clé | Colonnes |
+|---|---|---|---|
+| `abatement_techniques` | répétable | `idx` | 14 — `name`, `install_year`, `annex_ref`, `design_features`, `removal_efficiency`, `comments`, + flux massiques `intake_val`/`intake_comment`, `recycled_val`/`recycled_comment`, `discharge_val`/`discharge_comment`, `waste_res_val`/`waste_res_comment` |
+| `abatement_technique_sources` | à clés, enfant | `code` (4) | `spec` |
+
+Les quatre flux massiques (`intake`, `recycled`, `discharge`, `waste_res`) restent en
+colonnes larges : la liste est courte et stable, contrairement aux polluants.
+Codes `abatement_technique_sources` : `dryer`, `press`, `paper`, `other`.
+
+**Page 7**
+
+| Table | Type | Clé | Colonnes |
+|---|---|---|---|
+| `emission_points` | répétable | `idx` | 5 + 12 — `ep_id`, `ref_year`, `refcond`, `waste_gas_desc`, `comments`, puis les 12 paramètres de gaz : `cross_section`, `air_pressure`, `temp_dry`, `temp_wet`, `o2`, `co2`, `co_gas`, `inert`, `moisture`, `density_std`, `flow_actual`, `flow_std` |
+| `emission_point_pollutants` | à clés, enfant | `code` (37) | `conc`, `method`, `t_year`, `short_term`, `short_val`, `limit_val` |
+
+C'est la structure qui justifie le modèle hybride. En colonnes larges,
+37 polluants × 6 attributs produiraient 222 colonnes par point d'émission, dont la
+grande majorité vides, et l'ajout d'un polluant lors d'une révision BREF imposerait
+une migration. En table enfant, c'est un `INSERT` dans `ref_lists`.
+
+**Page 8**
+
+| Table | Type | Clé | Colonnes |
+|---|---|---|---|
+| `wastewater_streams` | répétable | `idx` | `discharge_id`, `ref_year`, `wwtp_desc`, `sludge_fate` |
+| `wastewater_sources` | à clés, enfant | `code` (8) | `vol`, `comment` |
+| `wastewater_pollutants` | à clés, enfant | `code` (13) | `conc`, `freq`, `pos`, `comments` |
+
+**Page 9**
+
+| Table | Type | Clé | Colonnes |
+|---|---|---|---|
+| `solid_residues` | répétable | `idx` | `description`, `ewc`, `source`, `qty`, `destination` |
+
+**Page 11**
+
+| Table | Type | Clé | Colonnes |
+|---|---|---|---|
+| `bat_candidate_categories` | à clés | `code` (9) | `selected BOOLEAN` |
+
+Codes : `energy`, `rawmat`, `water`, `emissions`, `primary_other`, `air`, `ww`,
+`solid`, `secondary_other`. Le champ HTML est une case à cocher dont la valeur est
+`'on'` ou vide ; elle est convertie en booléen.
+
+### 4.4 Total
+
+7 noyau + 12 tables de page + 23 tables enfants = **42 tables**.
+
+---
+
+## 5. Le manifeste
+
+Nouveau module `docs/fields.js`, chargé avant `app.js`. Une entrée par table,
+déclarant le motif de nom HTML existant et la correspondance vers les colonnes.
+
+```js
+const SCHEMA = {
+
+  contacts: {
+    kind: 'one', page: 0,
+    cols: { contact_company:'text', contact_email:'text', /* … 17 */ }
+  },
+
+  dryers: {
+    kind: 'many', page: 5, pattern: 'dryer_{idx}_{col}',
+    countField: 'dryer_count',
+    cols: { ref_year:'int', main_type:'text', temp_min:'num', temp_max:'num',
+            residence_val:'num', residence_unit:'text', /* … 11 */ }
+  },
+
+  raw_materials: {
+    kind: 'keyed', page: 3, pattern: 'rm_{code}_{col}', list: 'raw_materials',
+    cols: { specify:'text', species:'text', source:'text' }
+  },
+
+  emission_point_pollutants: {
+    kind: 'keyed', page: 7, parent: 'emission_points',
+    pattern: 'ep_{parent_idx}_poll_{code}_{col}', list: 'pollutants',
+    cols: { conc:'num', method:'text', t_year:'num',
+            short_term:'text', short_val:'num', limit_val:'num' }
+  },
+
+  wood_prep_operations: {
+    kind: 'keyed', page: 2, pattern: 's22_{code}_{col}', list: 'wood_prep_ops',
+    cols: { process_desc:'text', prod_t_batch:'num', wood_dry:'num', airflow:'num',
+            chan_air:'num', chan_treated:'bool', emit_limit:'bool',
+            dust_method:'text', monitoring:'text' }
+  },
+
+};
+```
+
+Le motif `s22_{code}_{col}` place le code **avant** la colonne, contrairement à
+`rm_{code}_{col}`… qui fait de même, mais à l'inverse de `dryer_{idx}_{col}`. Les
+motifs hétérogènes sont absorbés par le manifeste : c'est précisément son rôle. Aucune
+normalisation des noms HTML n'est entreprise, ce qui laisse les renderers intacts.
+
+**Ajouter une question au questionnaire** se réduit à : une ligne dans `cols`, une
+colonne dans le SQL, un champ dans le renderer.
+
+---
+
+## 6. Le dispatcher
+
+Nouveau module `docs/db.js`, exposant deux fonctions symétriques.
+
+### 6.1 Écriture — `dispatch(flatMap, pageId) → opérations par table`
+
+1. Filtrer les entrées du manifeste appartenant à `pageId`.
+2. Pour chaque entrée, faire correspondre les clés de la carte plate à son motif,
+   en extrayant `idx`, `code` et `parent_idx`.
+3. Grouper les valeurs par ligne cible, convertir selon le type déclaré
+   (`''` → `NULL`, `'on'` → `true`, chaîne numérique → `NUMERIC`).
+4. Émettre un `upsert` par table, et un `delete` pour les lignes dont l'indice dépasse
+   le compteur courant (cas d'un sécheur retiré par l'opérateur).
+5. Recalculer les colonnes `*_count` depuis le nombre de lignes enfants.
+
+Les tables enfants de second niveau sont écrites après leur parent, afin de disposer
+de la clé étrangère. L'ordre est dérivé du champ `parent` du manifeste, non codé en dur.
+
+### 6.2 Lecture — `hydrate(submissionId) → flatMap`
+
+L'inverse exact : lire les tables de la page, reconstruire les noms de champs depuis
+les motifs, produire la carte plate que les renderers attendent. Les valeurs `NULL`
+redeviennent `''`, les booléens redeviennent `'on'` ou `''`.
+
+### 6.3 Contrat de correction
+
+`hydrate(dispatch(m))` doit être égal à `m` pour toute carte plate `m` produite par le
+questionnaire. C'est la propriété que les tests vérifient (§ 8), et c'est aussi ce qui
+garantit que la migration ne perd rien.
+
+### 6.4 Auto-save
+
+L'auto-save (débounce 1 800 ms) reste inchangé du point de vue de l'utilisateur. Une
+sauvegarde de page touche entre 1 et 4 tables selon la page. Les upserts sont émis en
+une seule requête groupée par table.
+
+---
+
+## 7. Migration des données existantes
+
+Script `supabase/migrate/jsonb_to_relational.mjs`, exécuté hors ligne avec la clé
+`service_role` lue depuis `.env`.
+
+1. Lire toutes les lignes de `page_data`.
+2. Passer chaque `data` JSONB **dans le même `dispatch()`** que celui utilisé par le
+   webform. Le module est importé, pas réimplémenté : aucune divergence possible entre
+   le chemin de migration et le chemin d'écriture.
+3. Écrire les tables cibles.
+4. Produire un rapport :
+   - nombre de lignes créées par table ;
+   - **liste des clés JSONB non reconnues par le manifeste**, avec leur `submission_id`
+     et leur page. C'est le contrôle qui prouve l'exhaustivité : un rapport vide
+     signifie que chaque valeur stockée a trouvé une colonne.
+   - liste des valeurs rejetées à la conversion de type (ex. `"n/a"` dans un champ
+     numérique), avec leur destination.
+
+Le script s'exécute d'abord en mode `--dry-run` : il produit le rapport sans rien
+écrire. La migration réelle n'est lancée qu'après examen d'un rapport vide ou dont
+chaque anomalie a été explicitement acceptée.
+
+`page_data` est **conservée intacte** après la migration, en lecture seule, jusqu'à
+validation en conditions réelles. Sa suppression fait l'objet d'une migration
+ultérieure distincte.
+
+---
+
+## 8. Tests
+
+L'implémentation suit un cycle test-d'abord. Trois niveaux :
+
+**Aller-retour du dispatcher.** Pour chacune des 12 pages porteuses de champs, une
+carte plate de référence remplie de valeurs représentatives (dont les cas limites :
+chaîne vide, zéro, décimale, texte contenant une apostrophe, instance répétable
+supprimée au milieu de la série). Vérifier `hydrate(dispatch(m)) === m`.
+
+**Couverture du manifeste.** Un test qui parcourt les renderers, extrait tous les noms
+de champs générés, et vérifie que chacun correspond à exactement une entrée du
+manifeste. Ce test échoue si quelqu'un ajoute un champ au questionnaire sans déclarer
+sa colonne — c'est le garde-fou qui remplace la souplesse perdue du JSONB.
+
+**Intégrité du schéma.** Vérifier que chaque colonne déclarée dans le manifeste existe
+réellement dans la base avec le type annoncé, et réciproquement qu'aucune colonne
+métier n'est absente du manifeste.
+
+---
+
+## 9. Sécurité (RLS)
+
+Les 42 tables portent `ENABLE ROW LEVEL SECURITY`. Les politiques suivent le modèle
+existant, en remontant la chaîne de parenté jusqu'à `submissions.user_id` :
+
+- tables 1:1 de page — `submission_id IN (SELECT id FROM submissions WHERE user_id = auth.uid())` ;
+- tables enfants de premier niveau — même sous-requête ;
+- tables enfants de second niveau — jointure sur le parent, lui-même filtré ;
+- `ref_lists` — lecture pour tout utilisateur authentifié, écriture réservée au `service_role` ;
+- `audit_log` — `INSERT` seul pour `authenticated`, aucun `UPDATE` ni `DELETE` accordé.
+
+Ces politiques sont répétitives : elles sont **générées** par le même script qui produit
+le DDL depuis le manifeste, et non écrites à la main table par table.
+
+---
+
+## 10. Livrables
+
+| Fichier | Contenu |
+|---|---|
+| `supabase/migrations/002_relational_schema.sql` | DDL des 42 tables, index, triggers, politiques RLS |
+| `supabase/migrations/003_seed_ref_lists.sql` | Seed des listes de valeurs, généré depuis les tableaux JS |
+| `docs/fields.js` | Manifeste |
+| `docs/db.js` | Dispatcher : `dispatch()`, `hydrate()` |
+| `docs/app.js` | Modifié : chemins save/load réorientés vers le dispatcher |
+| `supabase/migrate/jsonb_to_relational.mjs` | Script de reprise avec `--dry-run` et rapport |
+| `tests/` | Les trois niveaux du § 8 |
+| `EuroPanel_DataDictionary.docx` | Régénéré depuis le manifeste |
+
+Les renderers `docs/pages-0-6.js` et `docs/pages-7-12.js` ne sont **pas** modifiés.
+
+---
+
+## 11. Hors périmètre
+
+Explicitement exclus de cette itération, pour éviter que le changement ne s'étende :
+
+- l'implémentation du workflow de révision et d'approbation (les colonnes de statut
+  sont créées, la logique applicative ne l'est pas) ;
+- le back-office administrateur EPF ;
+- les notifications par e-mail ;
+- l'alimentation de `audit_log` par des triggers (la table est créée, son remplissage
+  automatique fera l'objet d'une itération dédiée) ;
+- la suppression de `page_data` ;
+- les vues analytiques aplaties pour Qlik — elles deviennent largement inutiles une
+  fois le modèle relationnel en place, ce qui est précisément l'intérêt de ce
+  changement.
