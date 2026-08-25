@@ -89,13 +89,23 @@ function tableDdl(table, entry) {
       cols.push(['code', 'TEXT NOT NULL']);
       if (!entry.list) throw new Error(`${table}: entrée 'keyed' sans « list »`);
       if (!LISTS[entry.list]) throw new Error(`${table}: liste « ${entry.list} » inconnue`);
-      // Colonne constante générée : elle fige la liste de rattachement de la
-      // table et permet une clé étrangère composite vers ref_lists, donc une
-      // révision BREF ajoute un polluant par INSERT et non par migration.
-      // PostgreSQL accepte une expression de génération constante, et une
-      // clé étrangère portant une colonne générée tant que l'action
-      // référentielle reste NO ACTION — ce qui est le cas ici.
-      cols.push(['list_code', `TEXT GENERATED ALWAYS AS ('${entry.list}') STORED`]);
+      // Colonne constante : elle fige la liste de rattachement de la table et
+      // permet une clé étrangère composite vers ref_lists, donc une révision
+      // BREF ajoute un polluant par INSERT et non par migration.
+      //
+      // Une colonne GENERATED ALWAYS AS ('...') STORED porterait la même
+      // garantie, et la documentation PostgreSQL suggère qu'elle est valide
+      // dans une clé étrangère composite tant que l'action référentielle
+      // reste NO ACTION. Mais ce n'était pas vérifiable ici : il n'y a ni
+      // PostgreSQL ni Docker sur cette machine, et ce fichier s'applique à la
+      // main contre un projet Supabase réel — une migration qui échoue à
+      // mi-parcours est une mauvaise façon de découvrir que la doc avait
+      // tort. DEFAULT + CHECK donne la même garantie (une valeur figée, non
+      // fournie par l'appelant) sous une forme dont la validité dans une FK
+      // composite n'est pas en question. Ne pas « simplifier » ceci en
+      // GENERATED : c'est la forme qu'on a délibérément évitée.
+      cols.push(['list_code',
+        `TEXT NOT NULL DEFAULT '${entry.list}' CHECK (list_code = '${entry.list}')`]);
     }
   }
 

@@ -59,13 +59,22 @@ test('les groupes à clés ont code, une unicité et la FK composite vers ref_li
     assert.ok(body.includes(`UNIQUE (${parentCol}, code)`), `${table}: unicité manquante`);
     assert.ok(body.includes(`list_code`), `${table}: list_code manquante`);
     assert.ok(
-      body.includes(`TEXT GENERATED ALWAYS AS ('${e.list}') STORED`),
+      body.includes(`TEXT NOT NULL DEFAULT '${e.list}' CHECK (list_code = '${e.list}')`),
       `${table}: list_code n'est pas figée sur « ${e.list} »`);
     assert.ok(
       body.includes('FOREIGN KEY (list_code, code) REFERENCES europanel.ref_lists (list_code, code)'),
       `${table}: FK composite manquante`);
     assert.ok(LISTS[e.list], `${table}: liste « ${e.list} » absente du manifeste`);
   }
+});
+
+test('list_code n\'utilise pas de colonne générée : forme non vérifiable sur cette machine', () => {
+  // Ni PostgreSQL ni Docker ici : une GENERATED ALWAYS AS (...) STORED dans
+  // une clé étrangère composite n'a pas pu être testée contre un vrai
+  // serveur avant d'être appliquée à un projet Supabase réel. DEFAULT +
+  // CHECK donne la même garantie sous une forme dont la validité n'est pas
+  // en question.
+  assert.ok(!sql.includes('GENERATED ALWAYS'), 'GENERATED ALWAYS ne doit plus apparaître');
 });
 
 test('ref_lists est créée avant toute table qui la référence', () => {
