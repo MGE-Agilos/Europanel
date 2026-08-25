@@ -15,6 +15,13 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
+  // Codes des groupes a cles fixes. Refletent les tableaux const des renderers
+  // et alimentent le seed de ref_lists.
+  const LISTS = {
+    raw_materials: ['roundwood', 'vir_forest', 'sawdust', 'ext_prod_res',
+                    'ext_recycled', 'nonwood', 'other'],
+  };
+
   const SCHEMA = {
 
     contacts: {
@@ -47,7 +54,17 @@
       },
     },
 
+    raw_materials_section: {
+      kind: 'one', page: 3,
+      cols: { s32_comments: 'text' },
+    },
+
+    raw_materials: {
+      kind: 'keyed', page: 3, pattern: 'rm_{code}_{col}', list: 'raw_materials',
+      cols: { specify: 'text', species: 'text', source: 'text' },
+    },
+
   };
 
-  return { SCHEMA };
+  return { SCHEMA, LISTS };
 });

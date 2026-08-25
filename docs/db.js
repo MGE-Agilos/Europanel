@@ -13,7 +13,7 @@
 })(typeof self !== 'undefined' ? self : this, function (fields) {
   'use strict';
 
-  const { SCHEMA } = fields;
+  const { SCHEMA, LISTS } = fields;
 
   /* ── Coercition ───────────────────────────────────────────────────── */
 
@@ -139,6 +139,23 @@
         }
         ops.push({ table, kind: 'many', rows, deleteBeyondIdx: n });
       }
+      if (entry.kind === 'keyed') {
+        const rows = [];
+        for (const code of LISTS[entry.list]) {
+          const row = { code };
+          let any = false;
+          for (const [col, type] of Object.entries(entry.cols)) {
+            const raw = flat[buildName(entry.pattern,
+                                       { code, col: fieldSegment(entry, col) })];
+            if (raw !== undefined && raw !== '') any = true;
+            row[col] = toDb(raw, type);
+          }
+          // On n'ecrit une ligne que si au moins une colonne est renseignee,
+          // pour ne pas creer 37 lignes vides par point d'emission.
+          if (any) rows.push(row);
+        }
+        ops.push({ table, kind: 'keyed', rows });
+      }
     }
     return ops;
   }
@@ -169,6 +186,16 @@
           }
         }
         if (entry.countField) flat[entry.countField] = String(rows.length);
+      }
+      if (entry.kind === 'keyed') {
+        for (const row of rows) {
+          for (const [col, type] of Object.entries(entry.cols)) {
+            const v = fromDb(row[col], type);
+            if (v === undefined) continue;
+            flat[buildName(entry.pattern,
+              { code: row.code, col: fieldSegment(entry, col) })] = v;
+          }
+        }
       }
     }
     return flat;
