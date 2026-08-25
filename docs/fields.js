@@ -34,6 +34,10 @@
     site_activities: ['sawmill', 'glue', 'impreg_paper', 'paper_lam', 'other_value',
                       'combustion', 'incineration', 'ww_treatment', 'landfill',
                       'other_activities', 'other_specify'],
+    // Seules ces deux lignes de OTHER_ACT ont une unite non imposee : le
+    // renderer y affiche un champ de saisie, contrairement aux neuf autres
+    // codes de site_activities.
+    site_activity_unit_codes: ['other_activities', 'other_specify'],
 
     /* ── page 2 ─────────────────────────────────────────────────────── */
     storage_types: ['outdoor', 'indoor', 'silos'],
@@ -109,14 +113,6 @@
         plant_name: 'text', production_started: 'int',
         location_city: 'text', location_country: 'text', company: 'text',
         ref_year: 'int', comments: 'text',
-        // Trois exceptions du tableau 1.7. La colonne « unite » n'est un champ
-        // de saisie que pour les deux lignes dont l'unite n'est pas imposee,
-        // et le libelle n'est saisissable que pour la ligne « other_specify ».
-        // Les porter dans site_activities creerait des colonnes sans champ
-        // pour les neuf autres codes ; elles sont bien 1:1 avec la soumission.
-        act_other_activities_unit: 'text',
-        act_other_specify_unit: 'text',
-        act_other_specify_label: 'text',
       },
     },
 
@@ -134,6 +130,32 @@
       // present et ippc sont des selects Oui/Non ('y'/'n'), pas des cases a
       // cocher : 'bool' les lirait via value === 'on' et rendrait tout false.
       cols: { present: 'text', ippc: 'text', capacity: 'num' },
+    },
+
+    site_activity_units: {
+      // Deux exceptions du tableau 1.7 : la colonne « unite » n'est un champ
+      // de saisie que pour ces deux lignes, les neuf autres codes ayant une
+      // unite fixee par le renderer. Meme motif que raw_material_specify
+      // (page 3) : table distincte plutot qu'une colonne de plus sur
+      // site_activities, qui produirait neuf colonnes sans champ — et,
+      // avant ce correctif, plutot que deux colonnes de plus sur
+      // general_info, ou rien n'indiquait a quelle activite elles se
+      // rattachaient.
+      kind: 'keyed', page: 1, pattern: 'act_{code}_{col}',
+      list: 'site_activity_unit_codes',
+      cols: { unit: 'text' },
+    },
+
+    site_activity_other_specify: {
+      // act_other_specify_label n'existe que pour ce seul code de
+      // site_activities : une table a cles sur une liste d'un seul element
+      // serait plus lourde qu'une colonne simple pour ce que ca apporte.
+      // Table distincte de general_info (et non une colonne de plus a cote
+      // de plant_name) pour que le libelle reste identifiable comme
+      // rattache a l'activite « autre, a preciser », et non a la soumission
+      // en general.
+      kind: 'one', page: 1,
+      cols: { act_other_specify_label: 'text' },
     },
 
     /* ══ page 2 — WBP Plant Layout ═════════════════════════════════════ */
