@@ -80,8 +80,13 @@ test('le runner de test fonctionne', () => {
 
 - [ ] **Step 2: Lancer le test pour vérifier qu'il échoue**
 
-Run: `node --test tests/`
-Expected: FAIL — `Cannot find module` ou aucun test trouvé, car `package.json` n'existe pas encore et le dossier `tests/` vient d'être créé. Si Node trouve déjà le test et le passe, c'est acceptable : passer à l'étape 3.
+Run: `node --test "tests/**/*.test.js"`
+Expected: FAIL — aucun test trouvé ou échec, car `package.json` n'existe pas encore.
+
+**Ne pas utiliser `node --test tests/`.** Sur Node 22.14 sous Windows, passer un
+répertoire ne déclenche pas le balayage : Node tente de charger `tests` comme module
+CommonJS et échoue avec `MODULE_NOT_FOUND`. Vérifié sur ce poste. Le motif glob entre
+guillemets est résolu par le runner lui-même et fonctionne.
 
 - [ ] **Step 3: Créer le `package.json`**
 
@@ -94,7 +99,7 @@ Expected: FAIL — `Cannot find module` ou aucun test trouvé, car `package.json
   "private": true,
   "description": "WBP BREF data collection platform",
   "scripts": {
-    "test": "node --test tests/"
+    "test": "node --test \"tests/**/*.test.js\""
   }
 }
 ```
