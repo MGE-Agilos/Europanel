@@ -1221,6 +1221,17 @@ test('le manifeste couvre les 35 tables du questionnaire', () => {
   assert.strictEqual(Object.keys(SCHEMA).length, 35);
 });
 
+test('toute page declaree existe reellement', () => {
+  // Le questionnaire compte 13 pages, 0 a 12. La page 12 (Review & Submit)
+  // ne porte aucun champ : aucune entree ne doit s'y rattacher.
+  // Sans cette borne, une page 13 mal tapee passerait inapercue et ses
+  // donnees ne seraient jamais ni ecrites ni relues.
+  for (const [name, e] of Object.entries(SCHEMA)) {
+    assert.ok(Number.isInteger(e.page) && e.page >= 0 && e.page <= 11,
+      `${name}: page ${e.page} hors de la plage 0-11`);
+  }
+});
+
 test('toute entrée à clés référence une liste existante', () => {
   for (const [name, e] of Object.entries(SCHEMA)) {
     if (e.kind !== 'keyed') continue;
@@ -1439,6 +1450,20 @@ Trois motifs méritent attention :
 - `wood_prep_param_comments` et `bat_candidate_categories` n'ont **pas** de jeton `{col}` : leur unique colonne est portée par le motif lui-même. `buildName` l'accepte, puisqu'il ne remplace que les jetons présents.
 - `layout_sections` utilise `'{code}_{col}'` sans préfixe : les champs sont `outdoor_desc`, `indoor_dust_method`, etc.
 - `combustion_unit_outputs` combine `{parent_idx}` et `{idx}` sans `{col}`.
+
+- [ ] **Step 4b: Documenter le garde UMD**
+
+Le fichier passe de 35 à plusieurs centaines de lignes : le garde UMD en tête devient
+facile à prendre pour du bruit. Ajouter une ligne d'explication juste au-dessus :
+
+```js
+// UMD : expose l'API en global navigateur (window.EuroPanelFields) ou en module
+// CommonJS (Node, pour les tests). Le projet n'a pas d'etape de build, d'ou ce garde
+// plutot que import/export.
+(function (root, factory) {
+```
+
+Faire de même dans `docs/db.js`, avec `window.EuroPanelDb`.
 
 - [ ] **Step 5: Lancer les tests et vérifier qu'ils passent**
 
