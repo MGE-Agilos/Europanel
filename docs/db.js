@@ -157,6 +157,18 @@
         }
         ops.push({ table, kind: 'one', rows: [row] });
       }
+      // Une instance repetable est un signal de presence donne par
+      // l'operateur : il a ajoute un cinquieme secheur. Ce signal doit
+      // survivre meme si aucune colonne n'est encore remplie, sinon
+      // l'instance disparaitrait au prochain chargement de page et son
+      // action serait defaite sans qu'il en soit averti.
+      // Un code de la section 'keyed' releve au contraire d'une
+      // enumeration fixe dont la plupart des entrees sont simplement sans
+      // objet pour la soumission courante : tout ecrire produirait par
+      // exemple 37 lignes de polluants vides par point d'emission.
+      // D'ou l'asymetrie deliberee : 'many' ecrit les instances declarees
+      // meme vides, 'keyed' n'ecrit que les codes renseignes. Ne pas
+      // « harmoniser » les deux branches.
       if (entry.kind === 'many') {
         const n = countInstances(flat, entry);
         const rows = [];
