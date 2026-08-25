@@ -445,8 +445,20 @@ function removeCUColumn(ci) {
   if (ci <= 4) { toast('Cannot remove the first 4 combustion units.', 'info'); return; }
   const data = collectFormData();
   const current = parseInt(data.cu_count || 4, 10);
-  // Remove this CU's fields
-  Object.keys(data).forEach(k => { if (k.startsWith(`cu_${ci}_`)) delete data[k]; });
+  // Shift field values down, same as removeInstance: otherwise the
+  // combustion unit above the one removed keeps its data under its old
+  // cu_{i}_* name, which renderCurrentPage() no longer draws once cu_count
+  // is decremented, and the next auto-save (which only ever collects from
+  // the DOM) never writes it again.
+  for (let i = ci; i < current; i++) {
+    const el = document.querySelectorAll(`[name^="cu_${i}_"]`);
+    el.forEach(input => {
+      const nextName = input.name.replace(`cu_${i}_`, `cu_${i + 1}_`);
+      const nextEl   = document.querySelector(`[name="${nextName}"]`);
+      if (nextEl) data[input.name] = nextEl.value;
+      else        delete data[input.name];
+    });
+  }
   data.cu_count = current - 1;
   state.pageData[4] = data;
   renderCurrentPage();
