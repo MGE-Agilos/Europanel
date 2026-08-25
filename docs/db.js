@@ -98,8 +98,22 @@
   // L'interface renumérote les instances à la suppression : pas de trous.
   function countInstances(flat, entry) {
     if (entry.countField) {
-      const n = Number(flat[entry.countField]);
-      if (Number.isFinite(n) && n >= 0) return Math.min(n, PROBE_CAP);
+      // Comme dans toDb : une chaine vide ou blanche n'est pas un zero
+      // lisible, c'est l'absence de valeur. Number('') vaut 0 en JavaScript,
+      // ce qui ferait perdre a tort la priorite au compteur declare face au
+      // sondage des lors que le champ existe mais n'a jamais ete rempli.
+      const raw = flat[entry.countField];
+      const trimmed = raw === undefined || raw === null ? '' : String(raw).trim();
+      if (trimmed !== '') {
+        const n = Number(trimmed);
+        if (Number.isFinite(n) && n >= 0) {
+          if (n > PROBE_CAP) {
+            console.warn('countInstances: plafond de ' + PROBE_CAP +
+              ' instances atteint pour « ' + entry.pattern + ' » — valeur tronquee.');
+          }
+          return Math.min(n, PROBE_CAP);
+        }
+      }
     }
     let n = 0;
     while (n < PROBE_CAP) {
@@ -110,6 +124,10 @@
       );
       if (!present) break;
       n = idx;
+    }
+    if (n === PROBE_CAP) {
+      console.warn('countInstances: plafond de ' + PROBE_CAP +
+        ' instances atteint pour « ' + entry.pattern + ' » — valeur tronquee.');
     }
     return n;
   }
@@ -227,5 +245,5 @@
     return flat;
   }
 
-  return { toDb, fromDb, buildName, fieldSegment, dispatch, hydrate, SCHEMA };
+  return { toDb, fromDb, buildName, fieldSegment, countInstances, dispatch, hydrate, SCHEMA };
 });
