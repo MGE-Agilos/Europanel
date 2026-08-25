@@ -386,6 +386,62 @@
       pattern: 'ww_{parent_idx}_src_{code}_{col}', list: 'ww_sources',
       cols: { vol: 'num', comment: 'text' },
     },
+
+    /* ══ page 9 — Solid waste ══════════════════════════════════════════ */
+
+    waste_section: {
+      kind: 'one', page: 9,
+      cols: { waste_comments: 'text', waste_bat_techniques: 'text' },
+    },
+
+    waste_streams: {
+      kind: 'many', page: 9, pattern: 'waste_{idx}_{col}',
+      countField: 'waste_row_count',
+      // Le champ HTML est waste_N_desc ; desc est un mot reserve PostgreSQL.
+      aliases: { description: 'desc' },
+      cols: {
+        description: 'text', ewc: 'text', source: 'text', qty: 'num', dest: 'text',
+      },
+    },
+
+    /* ══ page 10 — Water consumption ═══════════════════════════════════ */
+
+    water_consumption: {
+      kind: 'one', page: 10,
+      cols: {
+        wc_process: 'num', wc_cooling: 'num', wc_steam: 'num', wc_sanitary: 'num',
+        wc_other: 'num', wc_refining_total: 'num', wc_refining_recycled: 'num',
+        wc_recycling_savings: 'num',
+        wc_bat_techniques: 'text', wc_comments: 'text',
+      },
+    },
+
+    /* ══ page 11 — Candidate BAT ═══════════════════════════════════════ */
+
+    bat_candidate: {
+      kind: 'one', page: 11,
+      cols: {
+        bat_plant_name: 'text', bat_name: 'text', bat_tech_desc: 'text',
+        // Input texte libre et non input numerique borne : l'operateur y ecrit
+        // couramment « 2019-2021 » ou « prevu 2026 ».
+        bat_install_year: 'text', bat_rd_level: 'text',
+        // Les seules cases a cocher du questionnaire. 'bool' est ici correct :
+        // toDb lit value === 'on', et une case decochee, absente de la carte
+        // plate, devient false et non null.
+        bat_cat_rawmat: 'bool', bat_cat_energy: 'bool', bat_cat_air: 'bool',
+        bat_cat_water: 'bool', bat_cat_primary_other: 'bool',
+        bat_cat_emissions: 'bool', bat_cat_ww: 'bool', bat_cat_solid: 'bool',
+        bat_cat_secondary_other: 'bool',
+        bat_env_air: 'text', bat_env_water: 'text', bat_env_energy: 'text',
+        bat_env_other: 'text', bat_cross_media: 'text', bat_applicability: 'text',
+        // Couts : inputs texte (« ~ 1,2 M€ », « n.c. »), jamais numeriques.
+        bat_invest_cost: 'text', bat_oper_cost: 'text',
+        bat_cost_effectiveness: 'text',
+        bat_reference_plants: 'text', bat_references: 'text',
+        bat_tech_comments: 'text',
+      },
+    },
+
   };
 
   return { SCHEMA, LISTS };
