@@ -83,9 +83,17 @@
     emission_point_pollutants: {
       kind: 'keyed', page: 7, parent: 'emission_points',
       pattern: 'ep_{parent_idx}_poll_{code}_{col}', list: 'pollutants',
+      // Le champ HTML est ..._limit ; la colonne ne peut pas s'appeler limit,
+      // mot reserve SQL. C'est precisement le cas qui a motive les alias.
+      aliases: { limit_val: 'limit' },
       cols: {
         conc: 'num', method: 'text', t_year: 'num',
-        short_term: 'text', short_val: 'num', limit_val: 'num',
+        short_term: 'text', short_val: 'num',
+        // 'text' et non 'num' : le renderer utilise deliberement un input
+        // texte, car une limite de permis s'ecrit souvent « <= 50 » ou
+        // « 50 (moyenne journaliere) ». La typer numerique mettrait ces
+        // valeurs a null sans avertissement.
+        limit_val: 'text',
       },
     },
 

@@ -62,3 +62,29 @@ test('aller-retour sur une structure imbriquée', () => {
   assert.strictEqual(back.ep_1_poll_nox_method, 'EN 14792');
   assert.strictEqual(Number(back.ep_2_poll_pm_conc), 5);
 });
+
+test('l’alias limit_val lit bien le champ ..._limit du formulaire', () => {
+  // Le renderer emet ep_N_poll_KEY_limit ; la colonne ne peut pas s'appeler
+  // limit, mot reserve SQL. Sans alias, la valeur serait perdue en silence.
+  const rows = opFor(dispatch({ ep_count: '1', ep_1_poll_nox_limit: '50' }, 7),
+                     'emission_point_pollutants').rows;
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].limit_val, '50');
+});
+
+test('une limite de permis qualifiee est conservee telle quelle', () => {
+  // Une limite s'ecrit souvent « <= 50 » ou « 50 (moyenne journaliere) ».
+  // Typee 'num', elle serait mise a null sans avertissement.
+  const rows = opFor(dispatch({ ep_count: '1', ep_1_poll_nox_limit: '<= 50' }, 7),
+                     'emission_point_pollutants').rows;
+  assert.strictEqual(rows[0].limit_val, '<= 50');
+});
+
+test('aller-retour de la limite de permis', () => {
+  const flat = { ep_count: '1', ep_1_poll_nox_limit: '50 (moyenne journaliere)' };
+  const ops = dispatch(flat, 7);
+  const rowsByTable = {};
+  ops.forEach(o => { rowsByTable[o.table] = o.rows; });
+  assert.strictEqual(hydrate(rowsByTable, 7).ep_1_poll_nox_limit,
+                     '50 (moyenne journaliere)');
+});
