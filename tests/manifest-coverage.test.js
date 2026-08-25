@@ -15,25 +15,21 @@ const { buildName, fieldSegment } = require('../docs/db.js');
 let SHAPES_BY_PAGE;
 test.before(async () => {
   const mod = await import('../tools/extract_fields.mjs');
-  SHAPES_BY_PAGE = mod.shapesByPage();
+  SHAPES_BY_PAGE = mod.fieldNamesByPage();
 });
 
 // ── Rapprochement des formes ────────────────────────────────────────────
 //
-// toShape() de tools/extract_fields.mjs est cense remplacer les indices
-// d'instance par {} ; sa regex /\b\d+\b/ ne se declenche jamais sur les noms
-// de ce questionnaire, car « _ » est un caractere de mot : dans
-// dryer_1_temp_max il n'existe aucune limite de mot autour du 1. La verite
-// terrain sort donc avec ses indices litteraux (dryer_1_temp_max), tandis que
-// le manifeste, index-agnostique, produit dryer_{}_temp_max. Comparer les deux
-// ensembles tels quels serait insatisfiable pour toute section repetable.
+// La verite terrain sort avec ses indices litteraux (dryer_1_temp_max), tandis
+// que le manifeste, index-agnostique, produit dryer_{}_temp_max. Le
+// rapprochement se fait ici, et dans ce sens uniquement : chaque forme du
+// manifeste devient une expression reguliere ancree ou {} vaut \d+.
 //
-// tools/ est hors perimetre ; on rapproche donc ici, et de la facon la plus
-// precise possible : chaque forme du manifeste devient une expression reguliere
-// ancree ou {} vaut \d+. On evite ainsi la normalisation inverse (ecraser tous
-// les indices de la verite terrain), qui confondrait des codes distincts —
-// other_1, other_2, other_3 page 8, output_1..output_5 page 4 — et rendrait le
-// test aveugle a une colonne oubliee parmi eux.
+// Le sens inverse — normaliser les indices de la verite terrain — serait plus
+// simple et serait faux. Il confondrait des noms distincts qui se terminent par
+// un chiffre : other_1, other_2 et other_3 page 8, output_1 a output_5 page 4.
+// Le test cesserait alors de voir qu'une colonne manque parmi eux, ce qui est
+// exactement le defaut qu'il existe pour attraper.
 function shapeToRegExp(shape) {
   const escaped = shape.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp('^' + escaped.replace(/\\\{\\\}/g, '(?:\\d+)') + '$');

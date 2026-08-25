@@ -63,33 +63,42 @@ export function renderedFieldsByPage() {
   return out;
 }
 
-// Remplace les indices d'instance par un jeton, pour comparer des formes
-// de noms plutôt que des valeurs : dryer_1_temp_max devient dryer_{}_temp_max.
-export function toShape(name) {
-  return name.replace(/\b\d+\b/g, '{}');
-}
-
-export function shapesByPage() {
+// Noms de champs distincts, triés, par page.
+//
+// Volontairement littéraux : aucune normalisation des indices n'est faite ici.
+// Une première version exposait un `toShape()` censé remplacer les indices par
+// un jeton, mais sa règle ne se déclenchait jamais — le souligné est un
+// caractère de mot, donc `dryer_1_temp_max` ne contient aucune frontière de mot
+// autour du 1. La fonction était un no-op qui se donnait l'air de travailler,
+// et le test de couverture ne passait que grâce à cette panne.
+//
+// Elle a été retirée plutôt que corrigée. Généraliser du côté de la vérité
+// terrain serait de toute façon une erreur : cela fondrait `other_1`,
+// `other_2` et `other_3` en une seule forme, et le test cesserait de voir
+// qu'une colonne manque parmi elles. La généralisation appartient au côté
+// manifeste, seul à savoir quels chiffres sont des indices d'instance et
+// lesquels font partie du nom.
+export function fieldNamesByPage() {
   const byPage = renderedFieldsByPage();
   const out = {};
   for (const [page, names] of Object.entries(byPage)) {
-    out[page] = [...new Set(names.map(toShape))].sort();
+    out[page] = [...new Set(names)].sort();
   }
   return out;
 }
 
 if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}` ||
     process.argv[1].endsWith('extract_fields.mjs')) {
-  const shapes = shapesByPage();
+  const shapes = fieldNamesByPage();
   if (process.argv.includes('--json')) {
     process.stdout.write(JSON.stringify(shapes, null, 1));
   } else {
     let total = 0;
     for (const page of Object.keys(shapes).sort((a, b) => a - b)) {
-      console.log(`\n── page ${page} — ${shapes[page].length} formes ──`);
+      console.log(`\n── page ${page} — ${shapes[page].length} champs ──`);
       console.log(shapes[page].join('\n'));
       total += shapes[page].length;
     }
-    console.log(`\nTotal : ${total} formes de champs distinctes.`);
+    console.log(`\nTotal : ${total} champs distincts.`);
   }
 }
