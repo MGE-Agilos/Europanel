@@ -252,6 +252,8 @@
       cols: { pct: 'num', description: 'text' },
     },
 
+    /* ══ page 5 — Dryers and presses ═══════════════════════════════════ */
+
     press_dryer_section: {
       kind: 'one', page: 5,
       // Pas de dryer_count ni press_count : un compteur derivable de COUNT(*)
@@ -265,9 +267,56 @@
       cols: {
         ref_year: 'int', main_type: 'text', system_desc: 'text', product: 'text',
         install_year: 'int', temp_min: 'num', temp_max: 'num',
+        // Temperature de sortie et taux d'humidite avant/apres sechage :
+        // ces trois colonnes portent le bilan energetique du secheur, l'objet
+        // meme de l'exercice BREF. Emises par numUnit(), elles etaient
+        // invisibles a l'inventaire par expression reguliere.
+        outlet_temp: 'num', mc_before: 'num', mc_after: 'num',
         product_dried: 'num', drying_rate: 'num',
         residence_val: 'num', residence_unit: 'text',
+        recirculation: 'text', heat_regained: 'text',
       },
+    },
+
+    presses: {
+      kind: 'many', page: 5, pattern: 'press_{idx}_{col}', countField: 'press_count',
+      cols: {
+        ref_year: 'int', main_type: 'text', system_desc: 'text', product: 'text',
+        install_year: 'int', output: 'num', factor: 'num',
+        temp: 'num', pressure: 'num',
+        exhaust_collected: 'text', abatement: 'text',
+      },
+    },
+
+    /* ══ page 6 — Abatement techniques and dust ════════════════════════ */
+
+    dust_section: {
+      kind: 'one', page: 6,
+      cols: {
+        s62_equip_desc: 'text', s62_collected_dust: 'num', s62_dust_fate: 'text',
+        s62_energy_recovery_pct: 'num', s62_monitoring: 'text',
+        s62_control_measures: 'text', s62_comments: 'text',
+      },
+    },
+
+    abatement_techniques: {
+      kind: 'many', page: 6, pattern: 'tech_{idx}_{col}', countField: 'tech_count',
+      cols: {
+        name: 'text', install_year: 'int', annex_ref: 'text',
+        design_features: 'text', removal_efficiency: 'text', comments: 'text',
+      },
+    },
+
+    abatement_technique_sources: {
+      kind: 'keyed', page: 6, parent: 'abatement_techniques',
+      pattern: 'tech_{parent_idx}_src_{code}_{col}', list: 'waste_gas_sources',
+      cols: { yn: 'text', spec: 'text' },
+    },
+
+    abatement_technique_flows: {
+      kind: 'keyed', page: 6, parent: 'abatement_techniques',
+      pattern: 'tech_{parent_idx}_{code}_{col}', list: 'abatement_flows',
+      cols: { val: 'num', comment: 'text' },
     },
 
     emission_points: {
