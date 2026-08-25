@@ -1210,112 +1210,74 @@ et arrivent en Tache 10.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const path = require('node:path');
 const { SCHEMA, LISTS } = require('../docs/fields.js');
 const { buildName, fieldSegment } = require('../docs/db.js');
 
 // Tous les noms de champs que le manifeste sait produire.
-function manifestNames() {
-  const names = new Set();
-  for (const entry of Object.values(SCHEMA)) {
-    const cols = Object.keys(entry.cols);
-    if (entry.kind === 'one') { cols.forEach(c => names.add(c)); continue; }
-    if (entry.countField) names.add(entry.countField);
+// Verite terrain : on execute les renderers et on lit les champs qu'ils
+// emettent reellement, via tools/extract_fields.mjs.
+//
+// Ne jamais revenir a un balayage du texte source. Les renderers construisent
+// une partie de leurs champs par litteral de gabarit (`dryer_${di}_temp_max`)
+// et une autre a travers des fonctions auxiliaires — numUnit(), ynSel() — qui
+// ecrivent l'attribut name a l'interieur du helper. Une expression reguliere
+// sur le source ne voit pas cette seconde categorie : c'est ainsi que seize
+// colonnes ont manque a l'inventaire initial, dont mc_before et mc_after, les
+// taux d'humidite avant et apres sechage qui portent le bilan energetique du
+// secheur — precisement ce que le BREF cherche a comparer.
+let SHAPES_BY_PAGE;
+test.before(async () => {
+  const mod = await import('../tools/extract_fields.mjs');
+  SHAPES_BY_PAGE = mod.shapesByPage();
+});
 
-    const parents = entry.parent ? [1, 2, 3] : [null];
-    for (const p of parents) {
-      if (entry.kind === 'many') {
-        for (const idx of [1, 2, 3]) {
-          cols.forEach(col => names.add(buildName(entry.pattern, { idx, col })));
-        }
-      } else {
-        for (const code of LISTS[entry.list]) {
-          cols.forEach(col => names.add(
-            buildName(entry.pattern, { code, col, parent_idx: p })
-          ));
-        }
+// Formes de noms que le manifeste sait produire pour une page donnee,
+// dans la meme normalisation que toShape() : les indices deviennent {}.
+function manifestShapes(pageId) {
+  const shapes = new Set();
+  for (const entry of Object.values(SCHEMA)) {
+    if (entry.page !== pageId) continue;
+    if (entry.kind === 'one') {
+      Object.keys(entry.cols).forEach(c => shapes.add(c));
+      continue;
+    }
+    if (entry.countField) shapes.add(entry.countField);
+    const codes = entry.kind === 'keyed' ? LISTS[entry.list] : [null];
+    for (const code of codes) {
+      for (const col of Object.keys(entry.cols)) {
+        const parts = { col: fieldSegment(entry, col) };
+        if (entry.pattern.includes('{idx}')) parts.idx = '{}';
+        if (entry.pattern.includes('{parent_idx}')) parts.parent_idx = '{}';
+        if (code !== null) parts.code = code;
+        shapes.add(buildName(entry.pattern, parts));
       }
     }
   }
-  return names;
-}
-
-function readRenderer(f) {
-  return fs.readFileSync(path.join(__dirname, '..', 'docs', f), 'utf8');
-}
-
-const RENDERERS = ['pages-0-6.js', 'pages-7-12.js'];
-
-// Noms littéraux présents dans les renderers : name="quelque_chose".
-function rendererLiteralNames() {
-  const names = new Set();
-  for (const f of RENDERERS) {
-    for (const m of readRenderer(f).matchAll(/name="([a-z0-9_]+)"/g)) names.add(m[1]);
-  }
-  return names;
-}
-
-// Noms construits par gabarit : name="dryer_${di}_temp_max".
-// Ils forment la majorite du questionnaire — secheurs, presses, polluants,
-// effluents — et echappent entierement au balayage litteral ci-dessus.
-// C'est par cette faille que ep_N_poll_KEY_limit a pu etre declare limit_val
-// dans le manifeste sans que rien ne signale que la colonne ne serait jamais
-// ni ecrite ni relue.
-// On normalise chaque interpolation ${...} en un jeton {} : on compare des
-// squelettes de noms, pas des valeurs.
-const INTERP = /\$\{[^}]*\}/g;
-
-function rendererTemplateShapes() {
-  const shapes = new Set();
-  for (const f of RENDERERS) {
-    const re = /name="((?:[a-zA-Z0-9_]|\$\{[^}]*\})+)"/g;
-    for (const m of readRenderer(f).matchAll(re)) {
-      if (!m[1].includes('${')) continue;
-      shapes.add(m[1].replace(INTERP, '{}'));
-    }
-  }
   return shapes;
 }
 
-// Squelettes que le manifeste sait produire, dans la meme normalisation.
-function manifestShapes() {
-  const shapes = new Set();
-  for (const entry of Object.values(SCHEMA)) {
-    if (entry.kind === 'one') continue;
-    for (const col of Object.keys(entry.cols)) {
-      shapes.add(entry.pattern
-        .replace(/\{(idx|parent_idx|code)\}/g, '{}')
-        .replace('{col}', fieldSegment(entry, col)));
-    }
+test('chaque champ emis par le questionnaire a une colonne declaree', () => {
+  const missing = [];
+  for (const [page, shapes] of Object.entries(SHAPES_BY_PAGE)) {
+    const known = manifestShapes(Number(page));
+    shapes.filter(sh => !known.has(sh)).forEach(sh => missing.push(`p${page}:${sh}`));
   }
-  return shapes;
-}
-
-test('chaque champ littéral des renderers a une colonne déclarée', () => {
-  const known = manifestNames();
-  const missing = [...rendererLiteralNames()].filter(n => !known.has(n));
   assert.deepStrictEqual(missing, [],
-    'champs sans colonne dans le manifeste : ' + missing.join(', '));
+    `${missing.length} champ(s) sans colonne : ` + missing.join(', '));
 });
 
-test('chaque champ construit par gabarit a une colonne declaree', () => {
-  // Sans ce test, seuls les champs a nom litteral sont couverts, soit une
-  // minorite du questionnaire.
-  const known = manifestShapes();
-  const missing = [...rendererTemplateShapes()].filter(sh => !known.has(sh));
-  assert.deepStrictEqual(missing, [],
-    'gabarits sans colonne dans le manifeste : ' + missing.join(', '));
-});
-
-test('chaque motif du manifeste correspond a un champ reel', () => {
-  // Le sens inverse, et le plus insidieux : une colonne declaree que le
-  // formulaire n'emet jamais ne sera ni ecrite ni relue, sans erreur ni
-  // avertissement. C'est exactement ce qui est arrive a limit_val.
-  const real = rendererTemplateShapes();
-  const orphans = [...manifestShapes()].filter(sh => !real.has(sh));
+test('chaque colonne declaree correspond a un champ reellement emis', () => {
+  // Le sens inverse, et le plus insidieux : une colonne que le formulaire
+  // n'emet jamais ne sera ni ecrite ni relue, sans erreur ni avertissement.
+  // C'est exactement ce qui est arrive a limit_val.
+  const orphans = [];
+  for (const [page, shapes] of Object.entries(SHAPES_BY_PAGE)) {
+    const real = new Set(shapes);
+    [...manifestShapes(Number(page))]
+      .filter(sh => !real.has(sh)).forEach(sh => orphans.push(`p${page}:${sh}`));
+  }
   assert.deepStrictEqual(orphans, [],
-    'colonnes sans champ correspondant : ' + orphans.join(', '));
+    `${orphans.length} colonne(s) sans champ : ` + orphans.join(', '));
 });
 
 test('le manifeste couvre les 33 tables du questionnaire', () => {
@@ -1438,7 +1400,35 @@ Les listes attendues, avec leur nom dans `LISTS` :
 
 Les paramètres de gaz (`exhaust_params`) sont des **colonnes** de `emission_points`, pas une liste de codes ; ils figurent ici uniquement pour la génération du seed `ref_lists`, qui sert à l'affichage des libellés.
 
-- [ ] **Step 4: Compléter `SCHEMA` avec les 42 entrées**
+- [ ] **Step 4: Compléter `SCHEMA`**
+
+**Les listes de colonnes ci-dessous sont indicatives et se sont révélées
+incomplètes.** Elles proviennent d'un balayage du texte source, aveugle aux champs
+émis par les fonctions auxiliaires. La source de vérité est :
+
+```bash
+node tools/extract_fields.mjs
+```
+
+Procéder page par page : lire les formes que l'outil rapporte pour la page, en
+déduire les tables et leurs colonnes, puis relancer `npm test` — les deux tests de
+couverture nomment précisément ce qui manque de chaque côté. Une page est finie
+quand aucun des deux ne signale plus rien pour elle.
+
+Écarts déjà identifiés entre les listes ci-dessous et la réalité :
+
+| Table | Listes ci-dessous | Réel | Colonnes à ajouter |
+|---|---|---|---|
+| `dryers` | 11 | 16 | `outlet_temp`, `mc_before`, `mc_after`, `recirculation`, `heat_regained` |
+| `presses` | 7 | 11 | `temp`, `pressure`, `exhaust_collected`, `abatement` |
+| `raw_materials` | 3 | 4 | `pct` |
+| `resins` | 2 | 3 | `pct` |
+
+La page 3 émet aussi un champ `ref_year` qu'aucune table ci-dessous ne réclame.
+Les pages 4 et 7, avec 135 et 228 formes, n'ont pas été confrontées : les traiter
+entièrement depuis l'outil.
+
+
 
 Les entrées déjà écrites aux tâches 2, 6, 7 et 8 sont conservées telles quelles. Ajouter les suivantes. Les colonnes proviennent de la spec § 4.2 et § 4.3.
 
