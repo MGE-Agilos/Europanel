@@ -5,3 +5,4 @@ node_modules/
 Qlik POC/
 .field-shapes.json
 migration-report.json
+.recon.mjs
