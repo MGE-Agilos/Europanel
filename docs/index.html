@@ -86,6 +86,12 @@
   <!-- Supabase CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <!-- App scripts (order matters) -->
+  <!-- fields.js publishes EuroPanelFields, which db.js reads at load time;
+       db.js publishes EuroPanelDb, which db-plan.js reads at load time.
+       Both throw loudly rather than degrade if loaded out of order. -->
+  <script src="fields.js"></script>
+  <script src="db.js"></script>
+  <script src="db-plan.js"></script>
   <script src="pages-0-6.js"></script>
   <script src="pages-7-12.js"></script>
   <script src="app.js"></script>
