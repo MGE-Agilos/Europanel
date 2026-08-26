@@ -109,37 +109,80 @@ async function loadOrCreateSubmission() {
   await loadAllPageData();
 }
 
+// Reads every manifest table for the current submission and rebuilds, per
+// page, the flat { field_name: value } map the renderers expect.
+//
+// One request per page, rooted at the submissions row, with child tables
+// embedded under their parent. The rationale for that shape — and for the
+// alternatives it was chosen over — is in db-plan.js, next to pageSelect().
+//
+// The embedding is also what makes parent-id ↔ parent-idx a non-problem on
+// the read path: a child row arrives *inside* its parent object, which
+// carries `idx`, so no primary key ever has to be resolved back to an
+// instance number. collectPageRows() only has to copy that idx down.
 async function loadAllPageData() {
-  const { data, error } = await sb
-    .from('page_data')
-    .select('page_id, data, saved_at')
-    .eq('submission_id', state.submission.id);
-  if (error) throw error;
+  const submissionId = state.submission.id;
+  // Built aside and swapped in at the end: a failing request must not leave
+  // the app showing a half-cleared questionnaire.
+  const pageData   = {};
+  const pageStatus = {};
 
-  state.pageData = {};
-  state.pageStatus = {};
-  (data || []).forEach(row => {
-    state.pageData[row.page_id] = row.data || {};
-    state.pageStatus[row.page_id] = hasContent(row.data) ? 'complete' : 'empty';
-  });
+  await Promise.all(PAGES.map(async page => {
+    const select = EuroPanelPlan.pageSelect(page.id);
+    if (!select) return;                    // page 12 owns no table
+    const { data, error } = await sb
+      .from('submissions')
+      .select(select)
+      .eq('id', submissionId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return;
+
+    const rowsByTable = EuroPanelPlan.collectPageRows(data, page.id);
+    // A page never saved comes back with every table empty. Hydrating it
+    // anyway would still produce the derived *_count keys (value '0'),
+    // which hasContent() reads as content — and every page would show as
+    // complete before the operator has typed anything. Leave such pages out
+    // of the maps entirely, exactly as the JSONB path left a never-saved
+    // page without a row.
+    const anyRows = Object.keys(rowsByTable).some(t => rowsByTable[t].length > 0);
+    if (!anyRows) return;
+
+    const flat = EuroPanelDb.hydrate(rowsByTable, page.id);
+    pageData[page.id]   = flat;
+    pageStatus[page.id] = hasContent(flat) ? 'complete' : 'empty';
+  }));
+
+  state.pageData   = pageData;
+  state.pageStatus = pageStatus;
 }
 
+// Writes one page: the raw flat map into submission_pages, then the typed
+// rows produced by dispatch(), parents before children.
+//
+// The ordering and the partial-failure reasoning live in db-plan.js
+// (applyPagePlan). In short: PostgREST cannot open a transaction, so the
+// raw payload is written first — after that point the database always holds
+// the complete map the operator meant to save, and the business tables are
+// regenerable from it even if a later write fails.
 async function savePageData(pageId, data) {
   if (!state.submission) {
     toast('Session not ready — please refresh the page.', 'error');
     return;
   }
   setSaveStatus('saving');
+  const status = hasContent(data) ? 'complete' : 'empty';
   try {
-    const { error } = await sb
-      .from('page_data')
-      .upsert(
-        { submission_id: state.submission.id, page_id: pageId, data, saved_at: new Date().toISOString() },
-        { onConflict: 'submission_id,page_id' }
-      );
-    if (error) throw error;
-    state.pageData[pageId] = data;
-    state.pageStatus[pageId] = hasContent(data) ? 'complete' : 'empty';
+    await EuroPanelPlan.applyPagePlan(sb, {
+      ops:          EuroPanelDb.dispatch(data, pageId),
+      submissionId: state.submission.id,
+      pageId:       pageId,
+      status:       status,
+      raw:          data,
+      savedAt:      new Date().toISOString(),
+    });
+    state.pageData[pageId]   = data;
+    state.pageStatus[pageId] = status;
     updateSidebarItem(pageId);
     setSaveStatus('saved');
   } catch (err) {
