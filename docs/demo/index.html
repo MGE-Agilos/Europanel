@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="An illustrated walkthrough of the EuroPanel dashboard, prepared for the European Panel Federation.">
+<meta name="robots" content="noindex">
+<title>EuroPanel Demo Script</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;0,700;1,400&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  html { color-scheme: light dark; }
+  body { margin: 0; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<style>
+  :root {
+    --ground:        #F6F8F4;
+    --surface:       #FFFFFF;
+    --surface-sunk:  #EDF1EA;
+    --ink:           #18211C;
+    --ink-soft:      #4A554E;
+    --ink-faint:     #6E7A72;
+    --rule:          #D4DCD2;
+    --rule-strong:   #B4C0B2;
+    --accent:        #2F6B4F;
+    --accent-soft:   #E2EEE6;
+    --critical:      #9C3B2E;
+    --critical-soft: #F6E4E0;
+    --caution:       #A66A16;
+    --caution-soft:  #F8EEDC;
+
+    --display: "Spectral", Georgia, "Times New Roman", serif;
+    --body: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --ground:        #10160F;
+      --surface:       #181F18;
+      --surface-sunk:  #131A13;
+      --ink:           #E4EAE1;
+      --ink-soft:      #AAB6A9;
+      --ink-faint:     #7E8A7D;
+      --rule:          #2A332A;
+      --rule-strong:   #3C473C;
+      --accent:        #6BAE86;
+      --accent-soft:   #1C2E23;
+      --critical:      #D98A79;
+      --critical-soft: #2E1D19;
+      --caution:       #D9A85C;
+      --caution-soft:  #2B2315;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:        #10160F;
+    --surface:       #181F18;
+    --surface-sunk:  #131A13;
+    --ink:           #E4EAE1;
+    --ink-soft:      #AAB6A9;
+    --ink-faint:     #7E8A7D;
+    --rule:          #2A332A;
+    --rule-strong:   #3C473C;
+    --accent:        #6BAE86;
+    --accent-soft:   #1C2E23;
+    --critical:      #D98A79;
+    --critical-soft: #2E1D19;
+    --caution:       #D9A85C;
+    --caution-soft:  #2B2315;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding-inline: 24px;
+    padding-block: 0 80px;
+  }
+
+  /* ── masthead ─────────────────────────────────────────────── */
+  .masthead {
+    padding-block: 56px 36px;
+    border-bottom: 2px solid var(--ink);
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+    font-weight: 600;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(34px, 6vw, 56px);
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-family: var(--display);
+    font-size: clamp(17px, 2.2vw, 21px);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  /* ── dataset strip ────────────────────────────────────────── */
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin-block: 36px 0;
+  }
+  .stat {
+    background: var(--surface);
+    padding: 16px 18px;
+  }
+  .stat dt {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 6px;
+  }
+  .stat dd {
+    margin: 0;
+    font-family: var(--display);
+    font-size: 27px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── sections ─────────────────────────────────────────────── */
+  section { margin-block: 64px 0; }
+  h2 {
+    font-family: var(--display);
+    font-size: clamp(23px, 3vw, 29px);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    margin: 0 0 8px;
+    text-wrap: balance;
+  }
+  .section-note {
+    color: var(--ink-soft);
+    max-width: 66ch;
+    margin: 0 0 28px;
+  }
+
+  /* ── acts ─────────────────────────────────────────────────── */
+  .act {
+    display: grid;
+    grid-template-columns: 232px 1fr;
+    gap: 32px;
+    padding-block: 30px;
+    border-top: 1px solid var(--rule);
+    align-items: start;
+  }
+  .act:first-of-type { border-top: 2px solid var(--rule-strong); }
+
+  .act-rail { position: sticky; top: 20px; }
+  .act-no {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 8px;
+  }
+  .act-sheet {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 14px;
+  }
+  .do {
+    background: var(--surface-sunk);
+    border-left: 3px solid var(--accent);
+    padding: 12px 14px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .do strong {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    margin-bottom: 7px;
+  }
+  .do kbd {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 1px 5px;
+    white-space: nowrap;
+  }
+
+  .act-body h3 {
+    font-family: var(--display);
+    font-size: 21px;
+    font-weight: 600;
+    margin: 0 0 12px;
+    line-height: 1.25;
+    text-wrap: balance;
+  }
+  .act-body p { margin: 0 0 14px; max-width: 64ch; }
+  .act-body p:last-child { margin-bottom: 0; }
+
+  .say {
+    border-left: 2px solid var(--rule-strong);
+    padding-left: 16px;
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 17px;
+    line-height: 1.5;
+    color: var(--ink);
+    margin: 18px 0 0;
+    max-width: 60ch;
+  }
+
+  /* ── figures ──────────────────────────────────────────────── */
+  .figures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0 0 16px;
+  }
+  .fig {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 9px 13px;
+    min-width: 96px;
+  }
+  .fig .k {
+    display: block;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 4px;
+  }
+  .fig .v {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .fig.hot { border-color: var(--critical); background: var(--critical-soft); }
+  .fig.hot .v { color: var(--critical); }
+
+  /* ── tables ───────────────────────────────────────────────── */
+  .tbl-scroll { overflow-x: auto; margin: 0 0 16px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    min-width: 380px;
+  }
+  caption {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding-bottom: 8px;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 12px 8px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    border-bottom-color: var(--rule-strong);
+  }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; padding-right: 0; }
+  tr.flag td { background: var(--critical-soft); }
+  tr.flag td.num { color: var(--critical); font-weight: 600; }
+
+  /* ── AEL chart ────────────────────────────────────────────── */
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 20px 20px 14px;
+    margin: 0 0 16px;
+  }
+  .chart-card h4 {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 16px;
+    font-weight: 600;
+  }
+  svg { display: block; width: 100%; height: auto; }
+  .bar-fail { fill: var(--critical); }
+  .bar-pass { fill: var(--surface-sunk); }
+  .ax-line { stroke: var(--rule-strong); stroke-width: 1; }
+  .grid-line { stroke: var(--rule); stroke-width: 1; }
+  .lbl { fill: var(--ink-soft); font-family: "JetBrains Mono", monospace; font-size: 11px; }
+  .lbl-strong { fill: var(--ink); font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 600; }
+  .lbl-tick { fill: var(--ink-faint); font-family: "JetBrains Mono", monospace; font-size: 10px; }
+
+  /* ── screenshots ──────────────────────────────────────────── */
+  .shot {
+    margin: 0 0 18px;
+  }
+  .shot img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--rule-strong);
+    background: var(--surface);
+  }
+  .shot figcaption {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    color: var(--ink-faint);
+    margin-top: 7px;
+  }
+
+  /* ── callout ──────────────────────────────────────────────── */
+  .callout {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    padding: 18px 20px;
+    margin: 0 0 16px;
+  }
+  .callout p { margin: 0; max-width: 62ch; }
+  .callout .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 7px;
+  }
+
+  /* ── caveats ──────────────────────────────────────────────── */
+  .caveats {
+    background: var(--surface-sunk);
+    border-top: 2px solid var(--caution);
+    padding: 26px 26px 10px;
+  }
+  .caveats h2 { font-size: 21px; margin-bottom: 16px; }
+  .caveats ul { margin: 0; padding-left: 19px; }
+  .caveats li { margin-bottom: 13px; max-width: 70ch; }
+  .caveats strong { font-weight: 600; }
+
+  footer {
+    margin-top: 60px;
+    padding-top: 22px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    color: var(--ink-faint);
+    max-width: 70ch;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    background: var(--surface-sunk);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  @media (max-width: 720px) {
+    .act { grid-template-columns: 1fr; gap: 18px; }
+    .act-rail { position: static; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Demo walkthrough · Environmental &amp; Technical WG</p>
+    <h1>Eight moves that make the case</h1>
+    <p class="standfirst">A scripted run through the EuroPanel dashboard for the European Panel Federation. Each move carries the screen it produces and the figures it puts on it — both read off the live app, so the narrative and the demo cannot drift apart.</p>
+  </header>
+
+  <dl class="strip">
+    <div class="stat"><dt>Sites</dt><dd>36</dd></div>
+    <div class="stat"><dt>Companies</dt><dd>26</dd></div>
+    <div class="stat"><dt>Countries</dt><dd>26</dd></div>
+    <div class="stat"><dt>Submissions</dt><dd>180</dd></div>
+    <div class="stat"><dt>Campaigns</dt><dd>5</dd></div>
+    <div class="stat"><dt>Reference years</dt><dd>21–25</dd></div>
+  </dl>
+
+  <section>
+    <h2>Before you start</h2>
+    <p class="section-note">Open the app with no selections active. Say in one sentence what they are about to see: a questionnaire the sector already fills in, turned into something the federation can argue with. Then work the eight moves in order — each one answers a question the room is already holding.</p>
+  </section>
+
+  <section>
+
+    <article class="act">
+      <div class="act-rail">
+        <span class="act-no">MOVE 01</span>
+        <span class="act-sheet">Sheet 1 · Panel coverage</span>
+        <div class="do"><strong>Do</strong>Nothing yet. Leave every filter clear.</div>
+      </div>
+      <div class="act-body">
+        <h3>Establish who is in the room before showing any number</h3>
+        <figure class="shot">
+          <img src="shots/capture-1.png" alt="Sheet 1, no selections: KPIs showing 36 plants, 26 companies, 180 submissions, 94% submitted, with sites per country and a coverage table.">
+          <figcaption>Sheet 1 · no selection</figcaption>
+        </figure>
+        <div class="figures">
+          <div class="fig"><span class="k">Sites</span><span class="v">36</span></div>
+          <div class="fig"><span class="k">Companies</span><span class="v">26</span></div>
+          <div class="fig"><span class="k">Countries</span><span class="v">26</span></div>
+          <div class="fig"><span class="k">Submitted</span><span class="v">94%</span></div>
+        </div>
+        <p>Representativeness is the first thing a regulator attacks, so it is the first thing the dashboard answers. The coverage table breaks down by country exactly the way EPF's own Annual Report does — sites, companies, submissions, declared production, completion rate.</p>
+        <p class="say">“Before any emission figure, here is precisely how much of the sector is behind it — and where the gaps are.”</p>
+      </div>
+    </article>
+
+    <article class="act">
+      <div class="act-rail">
+        <span class="act-no">MOVE 02</span>
+        <span class="act-sheet">Sheet 2 · Emissions benchmark</span>
+        <div class="do"><strong>Do</strong>In the top filter bar, open <kbd>Pollutant</kbd> and select <kbd>PM</kbd>.</div>
+      </div>
+      <div class="act-body">
+        <h3>Show the sector as a distribution, never as an average</h3>
+        <figure class="shot">
+          <img src="shots/capture-2.png" alt="Sheet 2, no selection: quartile and P90 bars for fourteen pollutants in mg/Nm3, descending from NOx to phenol.">
+          <figcaption>Sheet 2 · no selection · 14 pollutants, mg/Nm³ only</figcaption>
+        </figure>
+        <div class="figures">
+          <div class="fig"><span class="k">Sites</span><span class="v">36</span></div>
+          <div class="fig"><span class="k">Median</span><span class="v">10.0</span></div>
+          <div class="fig"><span class="k">P75</span><span class="v">13.0</span></div>
+          <div class="fig"><span class="k">P90</span><span class="v">16.3</span></div>
+        </div>
+        <p>Dust across 36 sites, in mg/Nm³. The quartile-and-P90 chart is the shape a BAT-AEL is argued against — a single sector average would hide precisely the spread that matters.</p>
+        <p class="say">“A mean would tell you 10. The useful number is that a tenth of the sector sits above 16.”</p>
+      </div>
+    </article>
+
+    <article class="act">
+      <div class="act-rail">
+        <span class="act-no">MOVE 03</span>
+        <span class="act-sheet">Sheet 2 · still on PM</span>
+        <div class="do"><strong>Do</strong>Keep <kbd>PM</kbd> selected. Walk the table below from the bottom row upward.</div>
+      </div>
+      <div class="act-body">
+        <h3>Turn the distribution into a negotiating position</h3>
+        <figure class="shot">
+          <img src="shots/capture-3.png" alt="Sheet 2 with PM selected: the AEL simulator bar chart showing 5, 13, 27 and 36 sites failing at candidate limits of 20, 15, 10 and 5 mg/Nm3.">
+          <figcaption>Sheet 2 · Pollutant = PM · the AEL simulator, bottom left</figcaption>
+        </figure>
+
+        <div class="chart-card">
+          <h4>Sites failing a candidate dust AEL, of 36</h4>
+          <svg viewBox="0 0 560 210" role="img" aria-label="Bar chart: at a dust limit of 20 mg/Nm3, 5 of 36 sites fail; at 15, 13 sites; at 10, 27 sites; at 5, all 36 sites.">
+            <line class="grid-line" x1="66" y1="20"  x2="540" y2="20"></line>
+            <line class="grid-line" x1="66" y1="58"  x2="540" y2="58"></line>
+            <line class="grid-line" x1="66" y1="96"  x2="540" y2="96"></line>
+            <line class="grid-line" x1="66" y1="134" x2="540" y2="134"></line>
+            <text class="lbl-tick" x="60" y="24"  text-anchor="end">36</text>
+            <text class="lbl-tick" x="60" y="62"  text-anchor="end">27</text>
+            <text class="lbl-tick" x="60" y="100" text-anchor="end">18</text>
+            <text class="lbl-tick" x="60" y="138" text-anchor="end">9</text>
+            <text class="lbl-tick" x="60" y="176" text-anchor="end">0</text>
+            <line class="ax-line" x1="66" y1="172" x2="540" y2="172"></line>
+
+            <rect class="bar-fail" x="92"  y="151" width="72" height="21"></rect>
+            <text class="lbl-strong" x="128" y="145" text-anchor="middle">5</text>
+            <text class="lbl" x="128" y="192" text-anchor="middle">20 mg/Nm³</text>
+
+            <rect class="bar-fail" x="204" y="117" width="72" height="55"></rect>
+            <text class="lbl-strong" x="240" y="111" text-anchor="middle">13</text>
+            <text class="lbl" x="240" y="192" text-anchor="middle">15 mg/Nm³</text>
+
+            <rect class="bar-fail" x="316" y="58"  width="72" height="114"></rect>
+            <text class="lbl-strong" x="352" y="52" text-anchor="middle">27</text>
+            <text class="lbl" x="352" y="192" text-anchor="middle">10 mg/Nm³</text>
+
+            <rect class="bar-fail" x="428" y="20"  width="72" height="152"></rect>
+            <text class="lbl-strong" x="464" y="14" text-anchor="middle">36</text>
+            <text class="lbl" x="464" y="192" text-anchor="middle">5 mg/Nm³</text>
+          </svg>
+        </div>
+
+        <div class="tbl-scroll">
+          <table>
+            <caption>Dust (PM) · 36 sites reporting</caption>
+            <thead>
+              <tr><th>If the AEL were set at</th><th class="num">Sites failing</th><th class="num">Share of panel</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>20 mg/Nm³</td><td class="num">5</td><td class="num">14%</td></tr>
+              <tr><td>15 mg/Nm³</td><td class="num">13</td><td class="num">36%</td></tr>
+              <tr class="flag"><td>10 mg/Nm³</td><td class="num">27</td><td class="num">75%</td></tr>
+              <tr class="flag"><td>5 mg/Nm³</td><td class="num">36</td><td class="num">100%</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>This is the move that changes the conversation. It converts member data into an answer to the only question the Commission's number really poses: who, concretely, cannot comply.</p>
+        <p class="say">“We are not arguing that the limit is unfair. We are telling you, from our own measurements, exactly how much of the European industry it excludes.”</p>
+      </div>
+    </article>
+
+    <article class="act">
+      <div class="act-rail">
+        <span class="act-no">MOVE 04</span>
+        <span class="act-sheet">Sheet 3 · What drives emissions</span>
+        <div class="do"><strong>Do</strong>Clear <kbd>PM</kbd>. Select <kbd>Pollutant → Formaldehyde</kbd>.</div>
+      </div>
+      <div class="act-body">
+        <h3>One limit cannot cover four different stacks</h3>
+        <figure class="shot">
+          <img src="shots/capture-4.png" alt="Sheet 3 with formaldehyde selected: median concentration split by emission point, panel type, resin and fuel.">
+          <figcaption>Sheet 3 · Pollutant = Formaldehyde</figcaption>
+        </figure>
+        <div class="tbl-scroll">
+          <table>
+            <caption>Formaldehyde, median mg/Nm³, by emission point</caption>
+            <thead>
+              <tr><th>Emission point</th><th class="num">Sites</th><th class="num">Median</th><th class="num">P90</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Dryer stack, recycled-wood fired, abated</td><td class="num">11</td><td class="num">9.18</td><td class="num">11.63</td></tr>
+              <tr><td>Sanding &amp; cut-to-size dust filter</td><td class="num">11</td><td class="num">6.60</td><td class="num">10.31</td></tr>
+              <tr><td>Press exhaust, hot press &amp; cooling</td><td class="num">30</td><td class="num">6.51</td><td class="num">10.44</td></tr>
+              <tr><td>Dryer stack, standard</td><td class="num">25</td><td class="num">5.43</td><td class="num">7.60</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>A recycled-wood-fired dryer sits nearly 70% above a standard one on the same pollutant. Averaging those together produces a number that describes no real installation — which is the technical argument for emission-point-specific conclusions.</p>
+        <p class="say">“Same pollutant, same sector, four processes. A single AEL would be written against a plant that doesn't exist.”</p>
+      </div>
+    </article>
+
+    <article class="act">
+      <div class="act-rail">
+        <span class="act-no">MOVE 05</span>
+        <span class="act-sheet">Sheet 2 · still on Formaldehyde</span>
+        <div class="do"><strong>Do</strong>Look at <kbd>Max concentration</kbd> in the statistics table, then click the outlying bar to isolate the site.</div>
+      </div>
+      <div class="act-body">
+        <h3>Catch the bad measurement before Brussels does</h3>
+        <figure class="shot">
+          <img src="shots/capture-5.png" alt="Sheet 2 with formaldehyde selected: peak concentration by site, one bar at 48.6 towering over the next at 15.29.">
+          <figcaption>Sheet 2 · Pollutant = Formaldehyde · peak by site</figcaption>
+        </figure>
+        <div class="figures">
+          <div class="fig hot"><span class="k">Highest site</span><span class="v">48.6</span></div>
+          <div class="fig"><span class="k">Next highest</span><span class="v">15.3</span></div>
+          <div class="fig"><span class="k">Sector median</span><span class="v">6.34</span></div>
+        </div>
+        <p>One site reports 48.6 mg/Nm³ where the next highest in the whole panel is 15.3 — three times the runner-up and roughly seven times the sector median. Nothing in the database flags it; it is found statistically, in two clicks.</p>
+        <p class="say">“If this reached the JRC unchallenged, it would sit in the sector's evidence base as a real number. We would rather find it ourselves and go back to the operator.”</p>
+      </div>
+    </article>
+
+    <article class="act">
+      <div class="act-rail">
+        <span class="act-no">MOVE 06</span>
+        <span class="act-sheet">Any sheet</span>
+        <div class="do"><strong>Do</strong>With that single site still selected, point at the median KPI — it has gone <em>blank</em>.</div>
+      </div>
+      <div class="act-body">
+        <h3>The confidentiality guard is in the measure, not in a promise</h3>
+        <figure class="shot">
+          <img src="shots/capture-6.png" alt="Sheet 2 with a single plant selected: the sector statistics are blank while the per-site peak chart still shows its value.">
+          <figcaption>Sheet 2 · one plant selected · sector statistics suppressed</figcaption>
+        </figure>
+        <div class="figures">
+          <div class="fig"><span class="k">Sites in view</span><span class="v">1</span></div>
+          <div class="fig"><span class="k">Median shown</span><span class="v">—</span></div>
+        </div>
+        <p>Every headline statistic is written as <code>If(Count(DISTINCT plant) &gt;= 3, …)</code>. Narrow the selection below three contributing sites and the figure suppresses itself. A trade association pooling competitors' data cannot rely on users remembering a rule; the rule is compiled into the metric.</p>
+        <p class="say">“You can hand this to any member. It will not show them a number that belongs to one competitor — it physically cannot.”</p>
+      </div>
+    </article>
+
+    <article class="act">
+      <div class="act-rail">
+        <span class="act-no">MOVE 07</span>
+        <span class="act-sheet">Sheet 6 · Trends</span>
+        <div class="do"><strong>Do</strong>Clear all selections. Point at the site count riding alongside the trend line.</div>
+      </div>
+      <div class="act-body">
+        <h3>Improvement, on a panel that does not move</h3>
+        <figure class="shot">
+          <img src="shots/capture-7.png" alt="Sheet 6: median concentration falling across five reference years with the site count riding flat at 36 alongside it.">
+          <figcaption>Sheet 6 · no selection · median against site count</figcaption>
+        </figure>
+        <div class="tbl-scroll">
+          <table>
+            <caption>Median concentration, mg/Nm³ · constant panel of 36 sites</caption>
+            <thead>
+              <tr><th>Reference year</th><th class="num">Sites</th><th class="num">Formaldehyde</th><th class="num">Dust</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>2021</td><td class="num">36</td><td class="num">6.60</td><td class="num">10.4</td></tr>
+              <tr><td>2022</td><td class="num">36</td><td class="num">6.47</td><td class="num">10.2</td></tr>
+              <tr><td>2023</td><td class="num">36</td><td class="num">6.67</td><td class="num">10.2</td></tr>
+              <tr><td>2024</td><td class="num">36</td><td class="num">5.98</td><td class="num">10.0</td></tr>
+              <tr><td>2025</td><td class="num">36</td><td class="num">5.51</td><td class="num">8.3</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Formaldehyde down 17%, dust down 20% across five reference years — and the site count sits on the same chart, unchanged at 36, so nobody can claim the improvement is an artefact of who answered that year. That second series is the reason the first one is credible.</p>
+        <p class="say">“The panel is identical in every year shown. This is the same plants getting better, not a different sample looking better.”</p>
+      </div>
+    </article>
+
+    <article class="act">
+      <div class="act-rail">
+        <span class="act-no">MOVE 08</span>
+        <span class="act-sheet">Sheet 5 · Circularity</span>
+        <div class="do"><strong>Do</strong>Close on this sheet, with no selections.</div>
+      </div>
+      <div class="act-body">
+        <h3>The same questionnaire already answers the circular-economy file</h3>
+        <figure class="shot">
+          <img src="shots/capture-8.png" alt="Sheet 5: circularity KPIs with pie charts of the raw material mix and of solid waste by destination.">
+          <figcaption>Sheet 5 · no selection</figcaption>
+        </figure>
+        <div class="figures">
+          <div class="fig"><span class="k">Recycled wood</span><span class="v">15.3%</span></div>
+          <div class="fig"><span class="k">Wood-based fuel</span><span class="v">63.6%</span></div>
+          <div class="fig"><span class="k">Diverted from landfill</span><span class="v">95.1%</span></div>
+        </div>
+        <p>These three figures come out of the emissions questionnaire at no extra cost to the operator, and they map directly onto positions EPF already defends in public: cascading use, recycled-wood standards, and the waste hierarchy applied to wood.</p>
+        <p class="say">“One collection exercise. It arms the Industrial Emissions task force and the circular-economy file at the same time.”</p>
+      </div>
+    </article>
+
+  </section>
+
+  <section>
+    <div class="callout">
+      <span class="tag">Closing ask</span>
+      <p>Everything shown runs on the questionnaire EPF already has. What turns it into this is a defined collection cycle, a stable site register, and the discipline of asking for the same fields each round. The dashboard is the easy part; the panel is the asset.</p>
+    </div>
+  </section>
+
+  <section class="caveats">
+    <h2>Say these out loud before anyone asks</h2>
+    <ul>
+      <li><strong>The data is entirely synthetic.</strong> 36 fictional sites across 26 countries, generated to be realistic in shape and magnitude. No operator data appears anywhere, which is exactly the commitment made to EPF in writing. The handful of earlier in-house test submissions has been removed from the database, so nothing in the panel is a real filing.</li>
+      <li><strong>The circularity trend is flat by construction.</strong> Recycled-wood share sits at 15.3% in every reference year because the generator does not vary the furnish mix between campaigns. Don't present it as a trend — either show it as a level, or ask for the generator to be given a cycle-over-cycle drift first.</li>
+      <li><strong>Plywood is declared under “Other”.</strong> The questionnaire's product list offers OSB, particleboard, MDF, HDF, softboard, hardboard and MBH — but no plywood, though EPF counts it among the six panels it represents. Worth raising as a questionnaire fix, not a dashboard one.</li>
+      <li><strong>Permit limits are free text.</strong> Operators write “20”, “&lt;= 20” or “20 (daily average)”, so the exceedance measure parses the leading number. A limit written with its unit would need a sturdier parse before this figure is used in anger.</li>
+      <li><strong>Concentrations are as reported.</strong> No normalisation to a common oxygen reference or moisture basis has been applied. For a real BREF submission that conversion has to happen before any cross-site comparison — the Technical WG will ask.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Figures read from the live EuroPanels app on 11 September 2026, after a full reload of all 40 tables from the Supabase questionnaire database. Re-read them if the data is reseeded before the session.
+  </footer>
+
+</div>
+
+</body>
+</html>

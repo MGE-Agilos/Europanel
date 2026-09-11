@@ -7,3 +7,9 @@ Qlik POC/
 migration-report.json
 .recon.mjs
 supabase/seed/.demo-seed-ids*.json
+
+# Exports binaires de l app Qlik (filet de securite, pas du code)
+qlik/backups/
+
+# Sauvegarde des lignes de test retirees de Supabase (donnees, pas du code)
+supabase/seed/.pre-seed-rows.removed-*.json
