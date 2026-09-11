@@ -1,0 +1,79 @@
+{
+  "_comment": [
+    "Les huit captures du parcours de demonstration, une par mouvement.",
+    "Chaque entree porte la selection EXACTE que le presentateur pose a",
+    "l'ecran : la capture et le texte du mouvement ne peuvent donc pas",
+    "diverger sans que ce fichier le dise.",
+    "",
+    "Rendues en PDF — le service de reporting ne rend pas une feuille",
+    "entiere en PNG — puis rasterisees en docs/demo/shots/capture-N.png",
+    "par tools/pdf_to_png.py. Chaine complete :",
+    "",
+    "  node tools/qlik_export_shots.mjs --manifest docs/demo/shots.json \\",
+    "       --out docs/demo/shots/pdf",
+    "  python tools/pdf_to_png.py docs/demo/shots/pdf docs/demo/shots"
+  ],
+  "tenant": "https://beyond-data-group-training.de.qlikcloud.com",
+  "appId": "2a8ea8d7-d223-4d47-9a3f-e81ea58b7408",
+  "shots": [
+    {
+      "id": "capture-1",
+      "title": "MOVE 01 — Sheet 1, aucune selection",
+      "sheet": "01c2c81c-1c5e-4522-b972-e12ac77e1ee5",
+      "format": "pdf",
+      "selections": {}
+    },
+    {
+      "id": "capture-2",
+      "title": "MOVE 02 — Sheet 2, aucune selection, les 14 polluants",
+      "sheet": "cb504b64-b92a-4dc2-856b-18c0a76512fa",
+      "format": "pdf",
+      "selections": {}
+    },
+    {
+      "id": "capture-3",
+      "title": "MOVE 03 — Sheet 2, polluant = PM, le simulateur d'AEL",
+      "sheet": "cb504b64-b92a-4dc2-856b-18c0a76512fa",
+      "format": "pdf",
+      "selections": { "emission_point_pollutants_code": ["pm"] }
+    },
+    {
+      "id": "capture-4",
+      "title": "MOVE 04 — Sheet 3, polluant = formaldehyde, par point d'emission",
+      "sheet": "28039f4d-29a5-4c6d-81b6-d1a6e3298e86",
+      "format": "pdf",
+      "selections": { "emission_point_pollutants_code": ["hcho"] }
+    },
+    {
+      "id": "capture-5",
+      "title": "MOVE 05 — Sheet 2, polluant = formaldehyde, pic par site",
+      "sheet": "cb504b64-b92a-4dc2-856b-18c0a76512fa",
+      "format": "pdf",
+      "selections": { "emission_point_pollutants_code": ["hcho"] }
+    },
+    {
+      "id": "capture-6",
+      "title": "MOVE 06 — Sheet 2, un seul site : les statistiques se suppriment",
+      "sheet": "cb504b64-b92a-4dc2-856b-18c0a76512fa",
+      "format": "pdf",
+      "selections": {
+        "emission_point_pollutants_code": ["hcho"],
+        "plants_name": ["Baltic Fibreboard — Jelgava Mill"]
+      }
+    },
+    {
+      "id": "capture-7",
+      "title": "MOVE 07 — Sheet 6, aucune selection, tendance et taille du panel",
+      "sheet": "d8e49e3d-5eb1-4129-aba0-2ea2a1786fc6",
+      "format": "pdf",
+      "selections": {}
+    },
+    {
+      "id": "capture-8",
+      "title": "MOVE 08 — Sheet 5, aucune selection, circularite",
+      "sheet": "ea2bce29-7b05-4518-847d-5e7b384759ff",
+      "format": "pdf",
+      "selections": {}
+    }
+  ]
+}
