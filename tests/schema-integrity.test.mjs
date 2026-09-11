@@ -33,10 +33,15 @@
      absente ; une colonne supprimee juste avant pourrait, symetriquement,
      se lire encore comme presente. Le cache est recharge par Supabase apres
      une migration, mais rien ici ne le garantit a la milliseconde.
-   - PostgREST rend `int32` aussi bien pour SMALLINT que pour INTEGER. Le
-     type 'int' du manifeste est donc verifie comme « entier », pas comme
-     « SMALLINT ». Le DDL genere reste la reference sur ce point, et
-     tests/gen-schema.test.mjs le couvre.
+   - Le vocabulaire des types a change sous nos pieds. PostgREST annoncait
+     `int32` et `int64` ; il annonce desormais les noms PostgreSQL,
+     `smallint` et `bigint`. Les deux sont acceptes ici, parce que rien dans
+     ce depot ne fixe la version de PostgREST qui repond : un test qui
+     n'accepterait qu'un seul vocabulaire virerait au rouge le jour d'une
+     mise a jour de Supabase, sans qu'aucune ligne du projet ait bouge.
+   - Consequence : le type 'int' du manifeste est verifie comme « entier »,
+     pas comme « SMALLINT ». Le DDL genere reste la reference sur ce point,
+     et tests/gen-schema.test.mjs le couvre.
    - De meme, `text` couvre TEXT, VARCHAR et CHAR indifferemment.
    - Rien n'est verifie sur NOT NULL, les valeurs par defaut, les
      contraintes CHECK, les cles etrangeres, les index, les triggers ni les
@@ -66,12 +71,13 @@ const { parentColumn } = require('../docs/db.js');
 
 /* ── Correspondance manifeste -> format PostgREST ─────────────────────── */
 
-// Le `format` que PostgREST annonce pour chaque type du manifeste.
-// 'int' donne int32 pour SMALLINT comme pour INTEGER : voir l'entete.
+// Le `format` que PostgREST annonce pour chaque type du manifeste. Chaque
+// entree liste les deux vocabulaires possibles — l'ancien (int32) et celui
+// des noms PostgreSQL (smallint, integer) : voir l'entete.
 const EXPECTED_FORMAT = {
   text: ['text'],
   num: ['numeric'],
-  int: ['int32'],
+  int: ['int32', 'smallint', 'integer'],
   bool: ['boolean'],
 };
 
@@ -81,14 +87,17 @@ const EXPECTED_FORMAT = {
 // quarante tables.
 function structuralColumns(table, entry) {
   const attach = entry.parent ? parentColumn(entry) : 'submission_id';
-  const cols = { updated_at: 'timestamp with time zone' };
+  // Listes, et non chaines : meme raison que EXPECTED_FORMAT ci-dessus, les
+  // deux vocabulaires de PostgREST doivent passer.
+  const ID = ['int64', 'bigint'];
+  const cols = { updated_at: ['timestamp with time zone'] };
   if (entry.kind === 'one') {
-    cols.submission_id = 'int64';
+    cols.submission_id = ID;
   } else {
-    cols.id = 'int64';
-    cols[attach] = 'int64';
-    if (entry.kind === 'many') cols.idx = 'int32';
-    if (entry.kind === 'keyed') { cols.code = 'text'; cols.list_code = 'text'; }
+    cols.id = ID;
+    cols[attach] = ID;
+    if (entry.kind === 'many') cols.idx = ['int32', 'smallint', 'integer'];
+    if (entry.kind === 'keyed') { cols.code = ['text']; cols.list_code = ['text']; }
   }
   return cols;
 }
@@ -195,11 +204,11 @@ test('les colonnes de structure sont la, avec le type attendu', opts, () => {
   for (const [table, entry] of Object.entries(SCHEMA)) {
     const props = columnsOf(table);
     if (!props) continue;
-    for (const [col, format] of Object.entries(structuralColumns(table, entry))) {
+    for (const [col, formats] of Object.entries(structuralColumns(table, entry))) {
       const prop = props[col];
       if (!prop) { problems.push(table + '.' + col + ' : colonne de structure absente'); continue; }
-      if (prop.format !== format) {
-        problems.push(table + '.' + col + ' : attendu « ' + format +
+      if (formats.indexOf(prop.format) < 0) {
+        problems.push(table + '.' + col + ' : attendu « ' + formats.join('|') +
                       ' », la base annonce « ' + prop.format + ' »');
       }
     }
