@@ -1,0 +1,40 @@
+// ═══════════════════════════════════════════════════════════════════
+// EuroPanel — ref_lists — tables de mappage des libellés
+// Généré par tools/gen_qlik_load_script.mjs — ne pas éditer à la main :
+// toute correction doit passer par docs/fields.js puis régénérer.
+// À inclure APRÈS 00_core.txt et AVANT toute section de page : les tables
+// à clés y résolvent leur libellé par ApplyMap au moment du chargement.
+// 
+// La clé de mappage est list_code & '|' & code, jamais code seul : un même
+// code (« other », « toc »...) réapparaît dans plusieurs listes et
+// rapprocherait des lignes sans rapport.
+// ═══════════════════════════════════════════════════════════════════
+LIB CONNECT TO 'Europanel:Europanel';
+
+// Plafond impose par PostgREST, pas un choix de confort : demander
+// davantage ne rend pas davantage, et rien n'avertit du plafonnement.
+LET vEpPageSize = 1000;
+RestConnectorMasterTable:
+SQL SELECT
+	"list_code",
+	"code",
+	"label",
+	"unit"
+FROM JSON (wrap on) "root"
+WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/ref_lists");
+
+// Une table de mappage se charge en exactement deux colonnes :
+// la clé, puis la valeur.
+RefLabelMap:
+MAPPING LOAD
+	[list_code] & '|' & [code],
+	[label]
+RESIDENT RestConnectorMasterTable;
+
+RefUnitMap:
+MAPPING LOAD
+	[list_code] & '|' & [code],
+	[unit]
+RESIDENT RestConnectorMasterTable;
+
+DROP TABLE RestConnectorMasterTable;

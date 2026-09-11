@@ -1,0 +1,261 @@
+// ═══════════════════════════════════════════════════════════════════
+// EuroPanel — Page 3 — raw_materials (6 tables)
+// Généré par tools/gen_qlik_load_script.mjs — ne pas éditer à la main :
+// toute correction doit passer par docs/fields.js puis régénérer.
+// submission_id (et, pour les tables enfants, la colonne *_id de leur
+// table parente) est la seule clé nue. Tout le reste est préfixé par le
+// nom de sa table pour éviter une association accidentelle avec une autre
+// section du questionnaire.
+// ═══════════════════════════════════════════════════════════════════
+LIB CONNECT TO 'Europanel:Europanel';
+
+// Plafond impose par PostgREST, pas un choix de confort : demander
+// davantage ne rend pas davantage, et rien n'avertit du plafonnement.
+LET vEpPageSize = 1000;
+// raw_materials_section
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[raw_materials_section]:
+LOAD * INLINE [
+submission_id, raw_materials_section_ref_year, raw_materials_section_s32_comments, raw_materials_section_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable:
+	SQL SELECT
+		"submission_id",
+		"ref_year",
+		"s32_comments",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/raw_materials_section?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable');
+
+	CONCATENATE ([raw_materials_section])
+	LOAD
+		[submission_id],
+		[ref_year] as [raw_materials_section_ref_year],
+		[s32_comments] as [raw_materials_section_s32_comments],
+		[updated_at] as [raw_materials_section_updated_at]
+	RESIDENT RestConnectorMasterTable;
+
+	DROP TABLE RestConnectorMasterTable;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// raw_materials
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[raw_materials]:
+LOAD * INLINE [
+raw_materials_id, submission_id, raw_materials_code, raw_materials_pct, raw_materials_species, raw_materials_source, raw_materials_updated_at, raw_materials_ref_label, raw_materials_ref_unit
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable2:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"code",
+		"list_code",
+		"pct",
+		"species",
+		"source",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/raw_materials?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable2');
+
+	CONCATENATE ([raw_materials])
+	LOAD
+		[id] as [raw_materials_id],
+		[submission_id],
+		[code] as [raw_materials_code],
+		[pct] as [raw_materials_pct],
+		[species] as [raw_materials_species],
+		[source] as [raw_materials_source],
+		[updated_at] as [raw_materials_updated_at],
+		ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code]) as [raw_materials_ref_label],
+		ApplyMap('RefUnitMap', [list_code] & '|' & [code], null()) as [raw_materials_ref_unit]
+	RESIDENT RestConnectorMasterTable2;
+
+	DROP TABLE RestConnectorMasterTable2;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// raw_material_specify
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[raw_material_specify]:
+LOAD * INLINE [
+raw_material_specify_id, submission_id, raw_material_specify_code, raw_material_specify_specify, raw_material_specify_updated_at, raw_material_specify_ref_label, raw_material_specify_ref_unit
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable3:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"code",
+		"list_code",
+		"specify",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/raw_material_specify?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable3');
+
+	CONCATENATE ([raw_material_specify])
+	LOAD
+		[id] as [raw_material_specify_id],
+		[submission_id],
+		[code] as [raw_material_specify_code],
+		[specify] as [raw_material_specify_specify],
+		[updated_at] as [raw_material_specify_updated_at],
+		ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code]) as [raw_material_specify_ref_label],
+		ApplyMap('RefUnitMap', [list_code] & '|' & [code], null()) as [raw_material_specify_ref_unit]
+	RESIDENT RestConnectorMasterTable3;
+
+	DROP TABLE RestConnectorMasterTable3;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// resins
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[resins]:
+LOAD * INLINE [
+resins_id, submission_id, resins_idx, resins_type, resins_pct, resins_comments, resins_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable4:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"idx",
+		"type",
+		"pct",
+		"comments",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/resins?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable4');
+
+	CONCATENATE ([resins])
+	LOAD
+		[id] as [resins_id],
+		[submission_id],
+		[idx] as [resins_idx],
+		[type] as [resins_type],
+		[pct] as [resins_pct],
+		[comments] as [resins_comments],
+		[updated_at] as [resins_updated_at]
+	RESIDENT RestConnectorMasterTable4;
+
+	DROP TABLE RestConnectorMasterTable4;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// hardeners
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[hardeners]:
+LOAD * INLINE [
+hardeners_id, submission_id, hardeners_idx, hardeners_type, hardeners_comments, hardeners_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable5:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"idx",
+		"type",
+		"comments",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/hardeners?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable5');
+
+	CONCATENATE ([hardeners])
+	LOAD
+		[id] as [hardeners_id],
+		[submission_id],
+		[idx] as [hardeners_idx],
+		[type] as [hardeners_type],
+		[comments] as [hardeners_comments],
+		[updated_at] as [hardeners_updated_at]
+	RESIDENT RestConnectorMasterTable5;
+
+	DROP TABLE RestConnectorMasterTable5;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// additives
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[additives]:
+LOAD * INLINE [
+additives_id, submission_id, additives_code, additives_type, additives_comments, additives_updated_at, additives_ref_label, additives_ref_unit
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable6:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"code",
+		"list_code",
+		"type",
+		"comments",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/additives?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable6');
+
+	CONCATENATE ([additives])
+	LOAD
+		[id] as [additives_id],
+		[submission_id],
+		[code] as [additives_code],
+		[type] as [additives_type],
+		[comments] as [additives_comments],
+		[updated_at] as [additives_updated_at],
+		ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code]) as [additives_ref_label],
+		ApplyMap('RefUnitMap', [list_code] & '|' & [code], null()) as [additives_ref_unit]
+	RESIDENT RestConnectorMasterTable6;
+
+	DROP TABLE RestConnectorMasterTable6;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+

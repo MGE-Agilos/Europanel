@@ -1,0 +1,96 @@
+// ═══════════════════════════════════════════════════════════════════
+// EuroPanel — Page 9 — solid_waste (2 tables)
+// Généré par tools/gen_qlik_load_script.mjs — ne pas éditer à la main :
+// toute correction doit passer par docs/fields.js puis régénérer.
+// submission_id (et, pour les tables enfants, la colonne *_id de leur
+// table parente) est la seule clé nue. Tout le reste est préfixé par le
+// nom de sa table pour éviter une association accidentelle avec une autre
+// section du questionnaire.
+// ═══════════════════════════════════════════════════════════════════
+LIB CONNECT TO 'Europanel:Europanel';
+
+// Plafond impose par PostgREST, pas un choix de confort : demander
+// davantage ne rend pas davantage, et rien n'avertit du plafonnement.
+LET vEpPageSize = 1000;
+// waste_section
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[waste_section]:
+LOAD * INLINE [
+submission_id, waste_section_waste_comments, waste_section_waste_bat_techniques, waste_section_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable:
+	SQL SELECT
+		"submission_id",
+		"waste_comments",
+		"waste_bat_techniques",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/waste_section?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable');
+
+	CONCATENATE ([waste_section])
+	LOAD
+		[submission_id],
+		[waste_comments] as [waste_section_waste_comments],
+		[waste_bat_techniques] as [waste_section_waste_bat_techniques],
+		[updated_at] as [waste_section_updated_at]
+	RESIDENT RestConnectorMasterTable;
+
+	DROP TABLE RestConnectorMasterTable;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// waste_streams
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[waste_streams]:
+LOAD * INLINE [
+waste_streams_id, submission_id, waste_streams_idx, waste_streams_description, waste_streams_ewc, waste_streams_source, waste_streams_qty, waste_streams_dest, waste_streams_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable2:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"idx",
+		"description",
+		"ewc",
+		"source",
+		"qty",
+		"dest",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/waste_streams?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable2');
+
+	CONCATENATE ([waste_streams])
+	LOAD
+		[id] as [waste_streams_id],
+		[submission_id],
+		[idx] as [waste_streams_idx],
+		[description] as [waste_streams_description],
+		[ewc] as [waste_streams_ewc],
+		[source] as [waste_streams_source],
+		[qty] as [waste_streams_qty],
+		[dest] as [waste_streams_dest],
+		[updated_at] as [waste_streams_updated_at]
+	RESIDENT RestConnectorMasterTable2;
+
+	DROP TABLE RestConnectorMasterTable2;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+

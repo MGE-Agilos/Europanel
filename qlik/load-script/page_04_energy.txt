@@ -1,0 +1,179 @@
+// ═══════════════════════════════════════════════════════════════════
+// EuroPanel — Page 4 — energy (3 tables)
+// Généré par tools/gen_qlik_load_script.mjs — ne pas éditer à la main :
+// toute correction doit passer par docs/fields.js puis régénérer.
+// submission_id (et, pour les tables enfants, la colonne *_id de leur
+// table parente) est la seule clé nue. Tout le reste est préfixé par le
+// nom de sa table pour éviter une association accidentelle avec une autre
+// section du questionnaire.
+// ═══════════════════════════════════════════════════════════════════
+LIB CONNECT TO 'Europanel:Europanel';
+
+// Plafond impose par PostgREST, pas un choix de confort : demander
+// davantage ne rend pas davantage, et rien n'avertit du plafonnement.
+LET vEpPageSize = 1000;
+// energy_section
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[energy_section]:
+LOAD * INLINE [
+submission_id, energy_section_ref_year, energy_section_comments, energy_section_s41_diagram_ref, energy_section_s43_steam, energy_section_s43_hot_oil, energy_section_s43_fluegas, energy_section_s43_other, energy_section_s43_cold_startups, energy_section_s43_warm_startups, energy_section_s43_maintenance_desc, energy_section_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable:
+	SQL SELECT
+		"submission_id",
+		"ref_year",
+		"comments",
+		"s41_diagram_ref",
+		"s43_steam",
+		"s43_hot_oil",
+		"s43_fluegas",
+		"s43_other",
+		"s43_cold_startups",
+		"s43_warm_startups",
+		"s43_maintenance_desc",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/energy_section?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable');
+
+	CONCATENATE ([energy_section])
+	LOAD
+		[submission_id],
+		[ref_year] as [energy_section_ref_year],
+		[comments] as [energy_section_comments],
+		[s41_diagram_ref] as [energy_section_s41_diagram_ref],
+		[s43_steam] as [energy_section_s43_steam],
+		[s43_hot_oil] as [energy_section_s43_hot_oil],
+		[s43_fluegas] as [energy_section_s43_fluegas],
+		[s43_other] as [energy_section_s43_other],
+		[s43_cold_startups] as [energy_section_s43_cold_startups],
+		[s43_warm_startups] as [energy_section_s43_warm_startups],
+		[s43_maintenance_desc] as [energy_section_s43_maintenance_desc],
+		[updated_at] as [energy_section_updated_at]
+	RESIDENT RestConnectorMasterTable;
+
+	DROP TABLE RestConnectorMasterTable;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// combustion_units
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[combustion_units]:
+LOAD * INLINE [
+combustion_unit_id, submission_id, combustion_units_idx, combustion_units_general_process, combustion_units_equip_type, combustion_units_boiler_detail, combustion_units_engine_ignition, combustion_units_chp, combustion_units_suppl_fire, combustion_units_dual_fuel, combustion_units_install_year, combustion_units_thermal_input, combustion_units_energy_output, combustion_units_hours_normal, combustion_units_hours_special, combustion_units_output_1, combustion_units_output_2, combustion_units_output_3, combustion_units_output_4, combustion_units_output_5, combustion_units_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable2:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"idx",
+		"general_process",
+		"equip_type",
+		"boiler_detail",
+		"engine_ignition",
+		"chp",
+		"suppl_fire",
+		"dual_fuel",
+		"install_year",
+		"thermal_input",
+		"energy_output",
+		"hours_normal",
+		"hours_special",
+		"output_1",
+		"output_2",
+		"output_3",
+		"output_4",
+		"output_5",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/combustion_units?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable2');
+
+	CONCATENATE ([combustion_units])
+	LOAD
+		[id] as [combustion_unit_id],
+		[submission_id],
+		[idx] as [combustion_units_idx],
+		[general_process] as [combustion_units_general_process],
+		[equip_type] as [combustion_units_equip_type],
+		[boiler_detail] as [combustion_units_boiler_detail],
+		[engine_ignition] as [combustion_units_engine_ignition],
+		[chp] as [combustion_units_chp],
+		[suppl_fire] as [combustion_units_suppl_fire],
+		[dual_fuel] as [combustion_units_dual_fuel],
+		[install_year] as [combustion_units_install_year],
+		[thermal_input] as [combustion_units_thermal_input],
+		[energy_output] as [combustion_units_energy_output],
+		[hours_normal] as [combustion_units_hours_normal],
+		[hours_special] as [combustion_units_hours_special],
+		[output_1] as [combustion_units_output_1],
+		[output_2] as [combustion_units_output_2],
+		[output_3] as [combustion_units_output_3],
+		[output_4] as [combustion_units_output_4],
+		[output_5] as [combustion_units_output_5],
+		[updated_at] as [combustion_units_updated_at]
+	RESIDENT RestConnectorMasterTable2;
+
+	DROP TABLE RestConnectorMasterTable2;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// combustion_unit_fuels
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[combustion_unit_fuels]:
+LOAD * INLINE [
+combustion_unit_fuels_id, combustion_unit_id, combustion_unit_fuels_code, combustion_unit_fuels_pct, combustion_unit_fuels_description, combustion_unit_fuels_updated_at, combustion_unit_fuels_ref_label, combustion_unit_fuels_ref_unit
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable3:
+	SQL SELECT
+		"id",
+		"combustion_unit_id",
+		"code",
+		"list_code",
+		"pct",
+		"description",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/combustion_unit_fuels?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable3');
+
+	CONCATENATE ([combustion_unit_fuels])
+	LOAD
+		[id] as [combustion_unit_fuels_id],
+		[combustion_unit_id],
+		[code] as [combustion_unit_fuels_code],
+		[pct] as [combustion_unit_fuels_pct],
+		[description] as [combustion_unit_fuels_description],
+		[updated_at] as [combustion_unit_fuels_updated_at],
+		ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code]) as [combustion_unit_fuels_ref_label],
+		ApplyMap('RefUnitMap', [list_code] & '|' & [code], null()) as [combustion_unit_fuels_ref_unit]
+	RESIDENT RestConnectorMasterTable3;
+
+	DROP TABLE RestConnectorMasterTable3;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+

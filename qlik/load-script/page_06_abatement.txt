@@ -1,0 +1,194 @@
+// ═══════════════════════════════════════════════════════════════════
+// EuroPanel — Page 6 — abatement (4 tables)
+// Généré par tools/gen_qlik_load_script.mjs — ne pas éditer à la main :
+// toute correction doit passer par docs/fields.js puis régénérer.
+// submission_id (et, pour les tables enfants, la colonne *_id de leur
+// table parente) est la seule clé nue. Tout le reste est préfixé par le
+// nom de sa table pour éviter une association accidentelle avec une autre
+// section du questionnaire.
+// ═══════════════════════════════════════════════════════════════════
+LIB CONNECT TO 'Europanel:Europanel';
+
+// Plafond impose par PostgREST, pas un choix de confort : demander
+// davantage ne rend pas davantage, et rien n'avertit du plafonnement.
+LET vEpPageSize = 1000;
+// dust_section
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[dust_section]:
+LOAD * INLINE [
+submission_id, dust_section_s62_equip_desc, dust_section_s62_collected_dust, dust_section_s62_dust_fate, dust_section_s62_energy_recovery_pct, dust_section_s62_monitoring, dust_section_s62_control_measures, dust_section_s62_comments, dust_section_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable:
+	SQL SELECT
+		"submission_id",
+		"s62_equip_desc",
+		"s62_collected_dust",
+		"s62_dust_fate",
+		"s62_energy_recovery_pct",
+		"s62_monitoring",
+		"s62_control_measures",
+		"s62_comments",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/dust_section?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable');
+
+	CONCATENATE ([dust_section])
+	LOAD
+		[submission_id],
+		[s62_equip_desc] as [dust_section_s62_equip_desc],
+		[s62_collected_dust] as [dust_section_s62_collected_dust],
+		[s62_dust_fate] as [dust_section_s62_dust_fate],
+		[s62_energy_recovery_pct] as [dust_section_s62_energy_recovery_pct],
+		[s62_monitoring] as [dust_section_s62_monitoring],
+		[s62_control_measures] as [dust_section_s62_control_measures],
+		[s62_comments] as [dust_section_s62_comments],
+		[updated_at] as [dust_section_updated_at]
+	RESIDENT RestConnectorMasterTable;
+
+	DROP TABLE RestConnectorMasterTable;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// abatement_techniques
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[abatement_techniques]:
+LOAD * INLINE [
+abatement_technique_id, submission_id, abatement_techniques_idx, abatement_techniques_name, abatement_techniques_install_year, abatement_techniques_annex_ref, abatement_techniques_design_features, abatement_techniques_removal_efficiency, abatement_techniques_comments, abatement_techniques_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable2:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"idx",
+		"name",
+		"install_year",
+		"annex_ref",
+		"design_features",
+		"removal_efficiency",
+		"comments",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/abatement_techniques?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable2');
+
+	CONCATENATE ([abatement_techniques])
+	LOAD
+		[id] as [abatement_technique_id],
+		[submission_id],
+		[idx] as [abatement_techniques_idx],
+		[name] as [abatement_techniques_name],
+		[install_year] as [abatement_techniques_install_year],
+		[annex_ref] as [abatement_techniques_annex_ref],
+		[design_features] as [abatement_techniques_design_features],
+		[removal_efficiency] as [abatement_techniques_removal_efficiency],
+		[comments] as [abatement_techniques_comments],
+		[updated_at] as [abatement_techniques_updated_at]
+	RESIDENT RestConnectorMasterTable2;
+
+	DROP TABLE RestConnectorMasterTable2;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// abatement_technique_sources
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[abatement_technique_sources]:
+LOAD * INLINE [
+abatement_technique_sources_id, abatement_technique_id, abatement_technique_sources_code, abatement_technique_sources_yn, abatement_technique_sources_spec, abatement_technique_sources_updated_at, abatement_technique_sources_ref_label, abatement_technique_sources_ref_unit
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable3:
+	SQL SELECT
+		"id",
+		"abatement_technique_id",
+		"code",
+		"list_code",
+		"yn",
+		"spec",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/abatement_technique_sources?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable3');
+
+	CONCATENATE ([abatement_technique_sources])
+	LOAD
+		[id] as [abatement_technique_sources_id],
+		[abatement_technique_id],
+		[code] as [abatement_technique_sources_code],
+		[yn] as [abatement_technique_sources_yn],
+		[spec] as [abatement_technique_sources_spec],
+		[updated_at] as [abatement_technique_sources_updated_at],
+		ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code]) as [abatement_technique_sources_ref_label],
+		ApplyMap('RefUnitMap', [list_code] & '|' & [code], null()) as [abatement_technique_sources_ref_unit]
+	RESIDENT RestConnectorMasterTable3;
+
+	DROP TABLE RestConnectorMasterTable3;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// abatement_technique_flows
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[abatement_technique_flows]:
+LOAD * INLINE [
+abatement_technique_flows_id, abatement_technique_id, abatement_technique_flows_code, abatement_technique_flows_val, abatement_technique_flows_comment, abatement_technique_flows_updated_at, abatement_technique_flows_ref_label, abatement_technique_flows_ref_unit
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable4:
+	SQL SELECT
+		"id",
+		"abatement_technique_id",
+		"code",
+		"list_code",
+		"val",
+		"comment",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/abatement_technique_flows?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable4');
+
+	CONCATENATE ([abatement_technique_flows])
+	LOAD
+		[id] as [abatement_technique_flows_id],
+		[abatement_technique_id],
+		[code] as [abatement_technique_flows_code],
+		[val] as [abatement_technique_flows_val],
+		[comment] as [abatement_technique_flows_comment],
+		[updated_at] as [abatement_technique_flows_updated_at],
+		ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code]) as [abatement_technique_flows_ref_label],
+		ApplyMap('RefUnitMap', [list_code] & '|' & [code], null()) as [abatement_technique_flows_ref_unit]
+	RESIDENT RestConnectorMasterTable4;
+
+	DROP TABLE RestConnectorMasterTable4;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+

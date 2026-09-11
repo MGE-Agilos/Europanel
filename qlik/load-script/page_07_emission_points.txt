@@ -1,0 +1,135 @@
+// ═══════════════════════════════════════════════════════════════════
+// EuroPanel — Page 7 — emission_points (2 tables)
+// Généré par tools/gen_qlik_load_script.mjs — ne pas éditer à la main :
+// toute correction doit passer par docs/fields.js puis régénérer.
+// submission_id (et, pour les tables enfants, la colonne *_id de leur
+// table parente) est la seule clé nue. Tout le reste est préfixé par le
+// nom de sa table pour éviter une association accidentelle avec une autre
+// section du questionnaire.
+// ═══════════════════════════════════════════════════════════════════
+LIB CONNECT TO 'Europanel:Europanel';
+
+// Plafond impose par PostgREST, pas un choix de confort : demander
+// davantage ne rend pas davantage, et rien n'avertit du plafonnement.
+LET vEpPageSize = 1000;
+// emission_points
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[emission_points]:
+LOAD * INLINE [
+emission_point_id, submission_id, emission_points_idx, emission_points_point_ref, emission_points_ref_year, emission_points_refcond, emission_points_waste_gas_desc, emission_points_comments, emission_points_cross_section, emission_points_air_pressure, emission_points_temp_dry, emission_points_temp_wet, emission_points_o2, emission_points_co2, emission_points_co_gas, emission_points_inert, emission_points_moisture, emission_points_density_std, emission_points_flow_actual, emission_points_flow_std, emission_points_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"idx",
+		"point_ref",
+		"ref_year",
+		"refcond",
+		"waste_gas_desc",
+		"comments",
+		"cross_section",
+		"air_pressure",
+		"temp_dry",
+		"temp_wet",
+		"o2",
+		"co2",
+		"co_gas",
+		"inert",
+		"moisture",
+		"density_std",
+		"flow_actual",
+		"flow_std",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/emission_points?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable');
+
+	CONCATENATE ([emission_points])
+	LOAD
+		[id] as [emission_point_id],
+		[submission_id],
+		[idx] as [emission_points_idx],
+		[point_ref] as [emission_points_point_ref],
+		[ref_year] as [emission_points_ref_year],
+		[refcond] as [emission_points_refcond],
+		[waste_gas_desc] as [emission_points_waste_gas_desc],
+		[comments] as [emission_points_comments],
+		[cross_section] as [emission_points_cross_section],
+		[air_pressure] as [emission_points_air_pressure],
+		[temp_dry] as [emission_points_temp_dry],
+		[temp_wet] as [emission_points_temp_wet],
+		[o2] as [emission_points_o2],
+		[co2] as [emission_points_co2],
+		[co_gas] as [emission_points_co_gas],
+		[inert] as [emission_points_inert],
+		[moisture] as [emission_points_moisture],
+		[density_std] as [emission_points_density_std],
+		[flow_actual] as [emission_points_flow_actual],
+		[flow_std] as [emission_points_flow_std],
+		[updated_at] as [emission_points_updated_at]
+	RESIDENT RestConnectorMasterTable;
+
+	DROP TABLE RestConnectorMasterTable;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// emission_point_pollutants
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[emission_point_pollutants]:
+LOAD * INLINE [
+emission_point_pollutants_id, emission_point_id, emission_point_pollutants_code, emission_point_pollutants_conc, emission_point_pollutants_method, emission_point_pollutants_t_year, emission_point_pollutants_short_term, emission_point_pollutants_short_val, emission_point_pollutants_limit_val, emission_point_pollutants_updated_at, emission_point_pollutants_ref_label, emission_point_pollutants_ref_unit
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable2:
+	SQL SELECT
+		"id",
+		"emission_point_id",
+		"code",
+		"list_code",
+		"conc",
+		"method",
+		"t_year",
+		"short_term",
+		"short_val",
+		"limit_val",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/emission_point_pollutants?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable2');
+
+	CONCATENATE ([emission_point_pollutants])
+	LOAD
+		[id] as [emission_point_pollutants_id],
+		[emission_point_id],
+		[code] as [emission_point_pollutants_code],
+		[conc] as [emission_point_pollutants_conc],
+		[method] as [emission_point_pollutants_method],
+		[t_year] as [emission_point_pollutants_t_year],
+		[short_term] as [emission_point_pollutants_short_term],
+		[short_val] as [emission_point_pollutants_short_val],
+		[limit_val] as [emission_point_pollutants_limit_val],
+		[updated_at] as [emission_point_pollutants_updated_at],
+		ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code]) as [emission_point_pollutants_ref_label],
+		ApplyMap('RefUnitMap', [list_code] & '|' & [code], null()) as [emission_point_pollutants_ref_unit]
+	RESIDENT RestConnectorMasterTable2;
+
+	DROP TABLE RestConnectorMasterTable2;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+

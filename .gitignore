@@ -13,3 +13,7 @@ qlik/backups/
 
 # Sauvegarde des lignes de test retirees de Supabase (donnees, pas du code)
 supabase/seed/.pre-seed-rows.removed-*.json
+
+# Captures Qlik : regenerables a l identique depuis qlik/shots.json
+qlik/shots/
+docs/demo/shots/pdf/
