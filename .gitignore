@@ -6,3 +6,4 @@ Qlik POC/
 .field-shapes.json
 migration-report.json
 .recon.mjs
+supabase/seed/.demo-seed-ids*.json
