@@ -1,0 +1,233 @@
+// ═══════════════════════════════════════════════════════════════════
+// EuroPanel — Page 2 — plant_layout (4 tables)
+// Généré par tools/gen_qlik_load_script.mjs — ne pas éditer à la main :
+// toute correction doit passer par docs/fields.js puis régénérer.
+// submission_id (et, pour les tables enfants, la colonne *_id de leur
+// table parente) est la seule clé nue. Tout le reste est préfixé par le
+// nom de sa table pour éviter une association accidentelle avec une autre
+// section du questionnaire.
+// ═══════════════════════════════════════════════════════════════════
+LIB CONNECT TO 'Europanel:Europanel';
+
+// Plafond impose par PostgREST, pas un choix de confort : demander
+// davantage ne rend pas davantage, et rien n'avertit du plafonnement.
+LET vEpPageSize = 1000;
+// plant_layout_section
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[plant_layout_section]:
+LOAD * INLINE [
+submission_id, plant_layout_section_ref_year, plant_layout_section_s21_comments, plant_layout_section_s22_comments, plant_layout_section_s23_present, plant_layout_section_s23_hours, plant_layout_section_s23_capacity, plant_layout_section_s23_chan_air, plant_layout_section_s23_chan_treated, plant_layout_section_s23_emit_limit, plant_layout_section_s23_dust_method, plant_layout_section_s23_monitoring, plant_layout_section_s23_comments, plant_layout_section_s24_desc, plant_layout_section_s24_chan_air, plant_layout_section_s24_chan_treated, plant_layout_section_s24_dust_method, plant_layout_section_s24_comments, plant_layout_section_s25_desc, plant_layout_section_s25_chan_air, plant_layout_section_s25_chan_treated, plant_layout_section_s25_dust_method, plant_layout_section_s25_comments, plant_layout_section_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable:
+	SQL SELECT
+		"submission_id",
+		"ref_year",
+		"s21_comments",
+		"s22_comments",
+		"s23_present",
+		"s23_hours",
+		"s23_capacity",
+		"s23_chan_air",
+		"s23_chan_treated",
+		"s23_emit_limit",
+		"s23_dust_method",
+		"s23_monitoring",
+		"s23_comments",
+		"s24_desc",
+		"s24_chan_air",
+		"s24_chan_treated",
+		"s24_dust_method",
+		"s24_comments",
+		"s25_desc",
+		"s25_chan_air",
+		"s25_chan_treated",
+		"s25_dust_method",
+		"s25_comments",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/plant_layout_section?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable');
+
+	CONCATENATE ([plant_layout_section])
+	LOAD
+		[submission_id],
+		[ref_year] as [plant_layout_section_ref_year],
+		[s21_comments] as [plant_layout_section_s21_comments],
+		[s22_comments] as [plant_layout_section_s22_comments],
+		[s23_present] as [plant_layout_section_s23_present],
+		[s23_hours] as [plant_layout_section_s23_hours],
+		[s23_capacity] as [plant_layout_section_s23_capacity],
+		[s23_chan_air] as [plant_layout_section_s23_chan_air],
+		[s23_chan_treated] as [plant_layout_section_s23_chan_treated],
+		[s23_emit_limit] as [plant_layout_section_s23_emit_limit],
+		[s23_dust_method] as [plant_layout_section_s23_dust_method],
+		[s23_monitoring] as [plant_layout_section_s23_monitoring],
+		[s23_comments] as [plant_layout_section_s23_comments],
+		[s24_desc] as [plant_layout_section_s24_desc],
+		[s24_chan_air] as [plant_layout_section_s24_chan_air],
+		[s24_chan_treated] as [plant_layout_section_s24_chan_treated],
+		[s24_dust_method] as [plant_layout_section_s24_dust_method],
+		[s24_comments] as [plant_layout_section_s24_comments],
+		[s25_desc] as [plant_layout_section_s25_desc],
+		[s25_chan_air] as [plant_layout_section_s25_chan_air],
+		[s25_chan_treated] as [plant_layout_section_s25_chan_treated],
+		[s25_dust_method] as [plant_layout_section_s25_dust_method],
+		[s25_comments] as [plant_layout_section_s25_comments],
+		[updated_at] as [plant_layout_section_updated_at]
+	RESIDENT RestConnectorMasterTable;
+
+	DROP TABLE RestConnectorMasterTable;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// raw_material_storage
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[raw_material_storage]:
+LOAD * INLINE [
+raw_material_storage_id, submission_id, raw_material_storage_code, raw_material_storage_pct, raw_material_storage_cap, raw_material_storage_area, raw_material_storage_updated_at, raw_material_storage_ref_label, raw_material_storage_ref_unit
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable2:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"code",
+		"list_code",
+		"pct",
+		"cap",
+		"area",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/raw_material_storage?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable2');
+
+	CONCATENATE ([raw_material_storage])
+	LOAD
+		[id] as [raw_material_storage_id],
+		[submission_id],
+		[code] as [raw_material_storage_code],
+		[pct] as [raw_material_storage_pct],
+		[cap] as [raw_material_storage_cap],
+		[area] as [raw_material_storage_area],
+		[updated_at] as [raw_material_storage_updated_at],
+		ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code]) as [raw_material_storage_ref_label],
+		ApplyMap('RefUnitMap', [list_code] & '|' & [code], null()) as [raw_material_storage_ref_unit]
+	RESIDENT RestConnectorMasterTable2;
+
+	DROP TABLE RestConnectorMasterTable2;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// wood_prep_operations
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[wood_prep_operations]:
+LOAD * INLINE [
+wood_prep_operations_id, submission_id, wood_prep_operations_code, wood_prep_operations_process_desc, wood_prep_operations_prod_t_batch, wood_prep_operations_wood_dry, wood_prep_operations_airflow, wood_prep_operations_chan_air, wood_prep_operations_chan_treated, wood_prep_operations_emit_limit, wood_prep_operations_dust_method, wood_prep_operations_monitoring, wood_prep_operations_updated_at, wood_prep_operations_ref_label, wood_prep_operations_ref_unit
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable3:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"code",
+		"list_code",
+		"process_desc",
+		"prod_t_batch",
+		"wood_dry",
+		"airflow",
+		"chan_air",
+		"chan_treated",
+		"emit_limit",
+		"dust_method",
+		"monitoring",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/wood_prep_operations?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable3');
+
+	CONCATENATE ([wood_prep_operations])
+	LOAD
+		[id] as [wood_prep_operations_id],
+		[submission_id],
+		[code] as [wood_prep_operations_code],
+		[process_desc] as [wood_prep_operations_process_desc],
+		[prod_t_batch] as [wood_prep_operations_prod_t_batch],
+		[wood_dry] as [wood_prep_operations_wood_dry],
+		[airflow] as [wood_prep_operations_airflow],
+		[chan_air] as [wood_prep_operations_chan_air],
+		[chan_treated] as [wood_prep_operations_chan_treated],
+		[emit_limit] as [wood_prep_operations_emit_limit],
+		[dust_method] as [wood_prep_operations_dust_method],
+		[monitoring] as [wood_prep_operations_monitoring],
+		[updated_at] as [wood_prep_operations_updated_at],
+		ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code]) as [wood_prep_operations_ref_label],
+		ApplyMap('RefUnitMap', [list_code] & '|' & [code], null()) as [wood_prep_operations_ref_unit]
+	RESIDENT RestConnectorMasterTable3;
+
+	DROP TABLE RestConnectorMasterTable3;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// wood_prep_param_comments
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[wood_prep_param_comments]:
+LOAD * INLINE [
+wood_prep_param_comments_id, submission_id, wood_prep_param_comments_code, wood_prep_param_comments_comments, wood_prep_param_comments_updated_at, wood_prep_param_comments_ref_label, wood_prep_param_comments_ref_unit
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable4:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"code",
+		"list_code",
+		"comments",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/wood_prep_param_comments?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable4');
+
+	CONCATENATE ([wood_prep_param_comments])
+	LOAD
+		[id] as [wood_prep_param_comments_id],
+		[submission_id],
+		[code] as [wood_prep_param_comments_code],
+		[comments] as [wood_prep_param_comments_comments],
+		[updated_at] as [wood_prep_param_comments_updated_at],
+		ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code]) as [wood_prep_param_comments_ref_label],
+		ApplyMap('RefUnitMap', [list_code] & '|' & [code], null()) as [wood_prep_param_comments_ref_unit]
+	RESIDENT RestConnectorMasterTable4;
+
+	DROP TABLE RestConnectorMasterTable4;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+

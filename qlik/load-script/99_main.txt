@@ -1,0 +1,30 @@
+// ═══════════════════════════════════════════════════════════════════
+// EuroPanel — Assemblage — à coller dans un onglet du Data Load Editor
+// Généré par tools/gen_qlik_load_script.mjs — ne pas éditer à la main :
+// toute correction doit passer par docs/fields.js puis régénérer.
+// Chaque .txt doit d'abord exister dans « Fichiers de données » de
+// l'espace Europanel : c'est la bibliothèque lib://Europanel:DataFiles ci-dessous.
+// Le chemin est qualifié par l'espace. « lib://DataFiles/… » ne trouve
+// rien depuis cette application, ce qui est vérifiable par FileList().
+// 
+// Must_Include et non Include : un Include dont le chemin est faux ne
+// produit AUCUNE erreur. Le rechargement se termine alors sur un
+// « succès » ayant lu zéro ligne, et l'application paraît simplement
+// vide. Must_Include échoue franchement, ce qui est le seul
+// comportement acceptable pour quinze fichiers dont tout dépend.
+// ═══════════════════════════════════════════════════════════════════
+
+$(Must_Include=lib://Europanel:DataFiles/00_core.txt);
+$(Must_Include=lib://Europanel:DataFiles/01_ref_lists.txt);
+$(Must_Include=lib://Europanel:DataFiles/page_00_contacts.txt);
+$(Must_Include=lib://Europanel:DataFiles/page_01_general_info.txt);
+$(Must_Include=lib://Europanel:DataFiles/page_02_plant_layout.txt);
+$(Must_Include=lib://Europanel:DataFiles/page_03_raw_materials.txt);
+$(Must_Include=lib://Europanel:DataFiles/page_04_energy.txt);
+$(Must_Include=lib://Europanel:DataFiles/page_05_dryers_presses.txt);
+$(Must_Include=lib://Europanel:DataFiles/page_06_abatement.txt);
+$(Must_Include=lib://Europanel:DataFiles/page_07_emission_points.txt);
+$(Must_Include=lib://Europanel:DataFiles/page_08_waste_water.txt);
+$(Must_Include=lib://Europanel:DataFiles/page_09_solid_waste.txt);
+$(Must_Include=lib://Europanel:DataFiles/page_10_water_consumption.txt);
+$(Must_Include=lib://Europanel:DataFiles/page_11_bat_candidate.txt);

@@ -1,0 +1,98 @@
+// ═══════════════════════════════════════════════════════════════════
+// EuroPanel — Page 11 — bat_candidate (1 table)
+// Généré par tools/gen_qlik_load_script.mjs — ne pas éditer à la main :
+// toute correction doit passer par docs/fields.js puis régénérer.
+// submission_id (et, pour les tables enfants, la colonne *_id de leur
+// table parente) est la seule clé nue. Tout le reste est préfixé par le
+// nom de sa table pour éviter une association accidentelle avec une autre
+// section du questionnaire.
+// ═══════════════════════════════════════════════════════════════════
+LIB CONNECT TO 'Europanel:Europanel';
+
+// Plafond impose par PostgREST, pas un choix de confort : demander
+// davantage ne rend pas davantage, et rien n'avertit du plafonnement.
+LET vEpPageSize = 1000;
+// bat_candidate
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[bat_candidate]:
+LOAD * INLINE [
+submission_id, bat_candidate_bat_plant_name, bat_candidate_bat_name, bat_candidate_bat_tech_desc, bat_candidate_bat_install_year, bat_candidate_bat_rd_level, bat_candidate_bat_cat_rawmat, bat_candidate_bat_cat_energy, bat_candidate_bat_cat_air, bat_candidate_bat_cat_water, bat_candidate_bat_cat_primary_other, bat_candidate_bat_cat_emissions, bat_candidate_bat_cat_ww, bat_candidate_bat_cat_solid, bat_candidate_bat_cat_secondary_other, bat_candidate_bat_env_air, bat_candidate_bat_env_water, bat_candidate_bat_env_energy, bat_candidate_bat_env_other, bat_candidate_bat_cross_media, bat_candidate_bat_applicability, bat_candidate_bat_invest_cost, bat_candidate_bat_oper_cost, bat_candidate_bat_cost_effectiveness, bat_candidate_bat_reference_plants, bat_candidate_bat_references, bat_candidate_bat_tech_comments, bat_candidate_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable:
+	SQL SELECT
+		"submission_id",
+		"bat_plant_name",
+		"bat_name",
+		"bat_tech_desc",
+		"bat_install_year",
+		"bat_rd_level",
+		"bat_cat_rawmat",
+		"bat_cat_energy",
+		"bat_cat_air",
+		"bat_cat_water",
+		"bat_cat_primary_other",
+		"bat_cat_emissions",
+		"bat_cat_ww",
+		"bat_cat_solid",
+		"bat_cat_secondary_other",
+		"bat_env_air",
+		"bat_env_water",
+		"bat_env_energy",
+		"bat_env_other",
+		"bat_cross_media",
+		"bat_applicability",
+		"bat_invest_cost",
+		"bat_oper_cost",
+		"bat_cost_effectiveness",
+		"bat_reference_plants",
+		"bat_references",
+		"bat_tech_comments",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/bat_candidate?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable');
+
+	CONCATENATE ([bat_candidate])
+	LOAD
+		[submission_id],
+		[bat_plant_name] as [bat_candidate_bat_plant_name],
+		[bat_name] as [bat_candidate_bat_name],
+		[bat_tech_desc] as [bat_candidate_bat_tech_desc],
+		[bat_install_year] as [bat_candidate_bat_install_year],
+		[bat_rd_level] as [bat_candidate_bat_rd_level],
+		[bat_cat_rawmat] as [bat_candidate_bat_cat_rawmat],
+		[bat_cat_energy] as [bat_candidate_bat_cat_energy],
+		[bat_cat_air] as [bat_candidate_bat_cat_air],
+		[bat_cat_water] as [bat_candidate_bat_cat_water],
+		[bat_cat_primary_other] as [bat_candidate_bat_cat_primary_other],
+		[bat_cat_emissions] as [bat_candidate_bat_cat_emissions],
+		[bat_cat_ww] as [bat_candidate_bat_cat_ww],
+		[bat_cat_solid] as [bat_candidate_bat_cat_solid],
+		[bat_cat_secondary_other] as [bat_candidate_bat_cat_secondary_other],
+		[bat_env_air] as [bat_candidate_bat_env_air],
+		[bat_env_water] as [bat_candidate_bat_env_water],
+		[bat_env_energy] as [bat_candidate_bat_env_energy],
+		[bat_env_other] as [bat_candidate_bat_env_other],
+		[bat_cross_media] as [bat_candidate_bat_cross_media],
+		[bat_applicability] as [bat_candidate_bat_applicability],
+		[bat_invest_cost] as [bat_candidate_bat_invest_cost],
+		[bat_oper_cost] as [bat_candidate_bat_oper_cost],
+		[bat_cost_effectiveness] as [bat_candidate_bat_cost_effectiveness],
+		[bat_reference_plants] as [bat_candidate_bat_reference_plants],
+		[bat_references] as [bat_candidate_bat_references],
+		[bat_tech_comments] as [bat_candidate_bat_tech_comments],
+		[updated_at] as [bat_candidate_updated_at]
+	RESIDENT RestConnectorMasterTable;
+
+	DROP TABLE RestConnectorMasterTable;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+

@@ -1,0 +1,174 @@
+// ═══════════════════════════════════════════════════════════════════
+// EuroPanel — Page 5 — dryers_presses (3 tables)
+// Généré par tools/gen_qlik_load_script.mjs — ne pas éditer à la main :
+// toute correction doit passer par docs/fields.js puis régénérer.
+// submission_id (et, pour les tables enfants, la colonne *_id de leur
+// table parente) est la seule clé nue. Tout le reste est préfixé par le
+// nom de sa table pour éviter une association accidentelle avec une autre
+// section du questionnaire.
+// ═══════════════════════════════════════════════════════════════════
+LIB CONNECT TO 'Europanel:Europanel';
+
+// Plafond impose par PostgREST, pas un choix de confort : demander
+// davantage ne rend pas davantage, et rien n'avertit du plafonnement.
+LET vEpPageSize = 1000;
+// press_dryer_section
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[press_dryer_section]:
+LOAD * INLINE [
+submission_id, press_dryer_section_comments, press_dryer_section_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable:
+	SQL SELECT
+		"submission_id",
+		"comments",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/press_dryer_section?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable');
+
+	CONCATENATE ([press_dryer_section])
+	LOAD
+		[submission_id],
+		[comments] as [press_dryer_section_comments],
+		[updated_at] as [press_dryer_section_updated_at]
+	RESIDENT RestConnectorMasterTable;
+
+	DROP TABLE RestConnectorMasterTable;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// dryers
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[dryers]:
+LOAD * INLINE [
+dryers_id, submission_id, dryers_idx, dryers_ref_year, dryers_main_type, dryers_system_desc, dryers_product, dryers_install_year, dryers_temp_min, dryers_temp_max, dryers_outlet_temp, dryers_mc_before, dryers_mc_after, dryers_product_dried, dryers_drying_rate, dryers_residence_val, dryers_residence_unit, dryers_recirculation, dryers_heat_regained, dryers_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable2:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"idx",
+		"ref_year",
+		"main_type",
+		"system_desc",
+		"product",
+		"install_year",
+		"temp_min",
+		"temp_max",
+		"outlet_temp",
+		"mc_before",
+		"mc_after",
+		"product_dried",
+		"drying_rate",
+		"residence_val",
+		"residence_unit",
+		"recirculation",
+		"heat_regained",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/dryers?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable2');
+
+	CONCATENATE ([dryers])
+	LOAD
+		[id] as [dryers_id],
+		[submission_id],
+		[idx] as [dryers_idx],
+		[ref_year] as [dryers_ref_year],
+		[main_type] as [dryers_main_type],
+		[system_desc] as [dryers_system_desc],
+		[product] as [dryers_product],
+		[install_year] as [dryers_install_year],
+		[temp_min] as [dryers_temp_min],
+		[temp_max] as [dryers_temp_max],
+		[outlet_temp] as [dryers_outlet_temp],
+		[mc_before] as [dryers_mc_before],
+		[mc_after] as [dryers_mc_after],
+		[product_dried] as [dryers_product_dried],
+		[drying_rate] as [dryers_drying_rate],
+		[residence_val] as [dryers_residence_val],
+		[residence_unit] as [dryers_residence_unit],
+		[recirculation] as [dryers_recirculation],
+		[heat_regained] as [dryers_heat_regained],
+		[updated_at] as [dryers_updated_at]
+	RESIDENT RestConnectorMasterTable2;
+
+	DROP TABLE RestConnectorMasterTable2;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
+// presses
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[presses]:
+LOAD * INLINE [
+presses_id, submission_id, presses_idx, presses_ref_year, presses_main_type, presses_system_desc, presses_product, presses_install_year, presses_output, presses_factor, presses_temp, presses_pressure, presses_exhaust_collected, presses_abatement, presses_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable3:
+	SQL SELECT
+		"id",
+		"submission_id",
+		"idx",
+		"ref_year",
+		"main_type",
+		"system_desc",
+		"product",
+		"install_year",
+		"output",
+		"factor",
+		"temp",
+		"pressure",
+		"exhaust_collected",
+		"abatement",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/presses?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable3');
+
+	CONCATENATE ([presses])
+	LOAD
+		[id] as [presses_id],
+		[submission_id],
+		[idx] as [presses_idx],
+		[ref_year] as [presses_ref_year],
+		[main_type] as [presses_main_type],
+		[system_desc] as [presses_system_desc],
+		[product] as [presses_product],
+		[install_year] as [presses_install_year],
+		[output] as [presses_output],
+		[factor] as [presses_factor],
+		[temp] as [presses_temp],
+		[pressure] as [presses_pressure],
+		[exhaust_collected] as [presses_exhaust_collected],
+		[abatement] as [presses_abatement],
+		[updated_at] as [presses_updated_at]
+	RESIDENT RestConnectorMasterTable3;
+
+	DROP TABLE RestConnectorMasterTable3;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+

@@ -1,0 +1,66 @@
+// ═══════════════════════════════════════════════════════════════════
+// EuroPanel — Page 10 — water_consumption (1 table)
+// Généré par tools/gen_qlik_load_script.mjs — ne pas éditer à la main :
+// toute correction doit passer par docs/fields.js puis régénérer.
+// submission_id (et, pour les tables enfants, la colonne *_id de leur
+// table parente) est la seule clé nue. Tout le reste est préfixé par le
+// nom de sa table pour éviter une association accidentelle avec une autre
+// section du questionnaire.
+// ═══════════════════════════════════════════════════════════════════
+LIB CONNECT TO 'Europanel:Europanel';
+
+// Plafond impose par PostgREST, pas un choix de confort : demander
+// davantage ne rend pas davantage, et rien n'avertit du plafonnement.
+LET vEpPageSize = 1000;
+// water_consumption
+// Coquille vide, puis une page par tour de boucle. PostgREST ne rend
+// JAMAIS plus de 1000 lignes par requête et ne signale pas qu'il tronque :
+// un SELECT nu sur une table plus longue chargerait 1000 lignes et
+// rechargerait « avec succès ». La boucle s'arrête sur la première page
+// incomplète ; une page vide est sans effet (vérifié dans l'application).
+[water_consumption]:
+LOAD * INLINE [
+submission_id, water_consumption_wc_process, water_consumption_wc_cooling, water_consumption_wc_steam, water_consumption_wc_sanitary, water_consumption_wc_other, water_consumption_wc_refining_total, water_consumption_wc_refining_recycled, water_consumption_wc_recycling_savings, water_consumption_wc_bat_techniques, water_consumption_wc_comments, water_consumption_updated_at
+];
+
+LET vEpOffset = 0;
+DO
+	RestConnectorMasterTable:
+	SQL SELECT
+		"submission_id",
+		"wc_process",
+		"wc_cooling",
+		"wc_steam",
+		"wc_sanitary",
+		"wc_other",
+		"wc_refining_total",
+		"wc_refining_recycled",
+		"wc_recycling_savings",
+		"wc_bat_techniques",
+		"wc_comments",
+		"updated_at"
+	FROM JSON (wrap on) "root"
+	WITH CONNECTION (Url "https://vxwmhsgxoomcbiukeinp.supabase.co/rest/v1/water_consumption?limit=$(vEpPageSize)&offset=$(vEpOffset)");
+
+	LET vEpRows = NoOfRows('RestConnectorMasterTable');
+
+	CONCATENATE ([water_consumption])
+	LOAD
+		[submission_id],
+		[wc_process] as [water_consumption_wc_process],
+		[wc_cooling] as [water_consumption_wc_cooling],
+		[wc_steam] as [water_consumption_wc_steam],
+		[wc_sanitary] as [water_consumption_wc_sanitary],
+		[wc_other] as [water_consumption_wc_other],
+		[wc_refining_total] as [water_consumption_wc_refining_total],
+		[wc_refining_recycled] as [water_consumption_wc_refining_recycled],
+		[wc_recycling_savings] as [water_consumption_wc_recycling_savings],
+		[wc_bat_techniques] as [water_consumption_wc_bat_techniques],
+		[wc_comments] as [water_consumption_wc_comments],
+		[updated_at] as [water_consumption_updated_at]
+	RESIDENT RestConnectorMasterTable;
+
+	DROP TABLE RestConnectorMasterTable;
+	LET vEpOffset = $(vEpOffset) + $(vEpPageSize);
+LOOP WHILE vEpRows = $(vEpPageSize)
+
