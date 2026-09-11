@@ -262,8 +262,15 @@ async function downloadTo(env, location, file) {
   return fs.statSync(file).size;
 }
 
-export async function exportShot(env, shot, appId, outDir, log) {
+/* Le service resservait un rendu deja produit pour le meme outputId tant que
+   les DONNEES de l'application n'avaient pas change. Une modification qui ne
+   passe pas par un rechargement — disposition d'une feuille, titre, format
+   d'une mesure — rendait donc a l'identique, et l'on croyait la modification
+   perdue. `--fresh` suffixe l'identifiant pour forcer un rendu neuf ; il ne
+   change rien au nom du fichier ecrit. */
+export async function exportShot(env, shot, appId, outDir, log, fresh = false) {
   const body = buildRequest(shot, appId);
+  if (fresh) body.output.outputId = shot.id + '-' + Date.now();
   const res = await qlikFetch(env, '/api/v1/reports', {
     method: 'POST', body: JSON.stringify(body),
   });
@@ -294,6 +301,8 @@ const USAGE = [
   '  --only a,b,c         n\'exporte que ces identifiants de capture',
   '  --key-env <NOM>      variable d\'environnement portant la cle API',
   '  --reload             recharge l\'app et attend la fin avant de capturer',
+  '  --fresh              force un rendu neuf (le service resservait le sien',
+  '                       apres une modification sans rechargement)',
   '  --dry-run            affiche les corps de requete, n\'appelle rien',
   '',
   'Cle API : variable d\'environnement QLIK_API_KEY ou QlikCloudTraining,',
@@ -308,6 +317,7 @@ export async function run(argv) {
   let dry = false;
   let keyVar = null;
   let reload = false;
+  let fresh = false;
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -316,6 +326,7 @@ export async function run(argv) {
     if (a === '--only') { only = new Set((argv[++i] || '').split(',').filter(Boolean)); continue; }
     if (a === '--key-env') { keyVar = argv[++i] || null; continue; }
     if (a === '--reload') { reload = true; continue; }
+    if (a === '--fresh') { fresh = true; continue; }
     if (a === '--dry-run') { dry = true; continue; }
     if (a === '--help' || a === '-h') { console.log(USAGE); return 0; }
     throw new Error('argument inconnu : ' + a + '\n' + USAGE);
@@ -365,7 +376,7 @@ export async function run(argv) {
     console.log('  ' + shot.id + (shot.title ? '  — ' + shot.title : ''));
     try {
       const { file, size } = await exportShot(env, shot, appId, outDir,
-                                              s => console.log(s));
+                                              s => console.log(s), fresh);
       console.log('    ecrit : ' + path.relative(REPO_ROOT, file) +
                   '  (' + Math.round(size / 1024) + ' Ko)');
       ok++;

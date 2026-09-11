@@ -1,0 +1,763 @@
+// ═══════════════════════════════════════════════════════════════════
+// EuroPanel — submission_values — toutes les réponses en table longue
+// Généré par tools/gen_qlik_load_script.mjs — ne pas éditer à la main :
+// toute correction doit passer par docs/fields.js puis régénérer.
+// Une ligne par (soumission, section, instance, champ). ~120 000 lignes.
+// 
+// Pourquoi une table longue plutôt que trente tableaux posés à la main :
+// compter ce qui MANQUE suppose de connaître la liste des champs attendus.
+// Un tableau construit à la main ne connaît que les champs qu'il affiche,
+// et ne peut donc rien dire d'un champ vide. Cette table tient sa liste du
+// manifeste, donc elle suit le questionnaire sans que personne y pense.
+// 
+// Toutes les colonnes sont préfixées sv_ sauf submission_id, qui est le
+// lien voulu avec le reste du modèle. Sans ce préfixe, « code », « idx »
+// ou « field » rencontreraient leurs homonymes dans quinze autres tables
+// et Qlik fabriquerait des clés synthétiques par le milieu du modèle.
+// 
+// À inclure APRÈS toutes les sections de page : tout ici est du RESIDENT.
+// ═══════════════════════════════════════════════════════════════════
+
+// Les tables à clés imbriquées ne portent pas submission_id : leur seul
+// lien est l'identifiant de leur parent répétable. On y remonte la
+// soumission et le numéro d'instance du parent.
+Map_abatement_techniques_sub:
+MAPPING LOAD [abatement_technique_id], [submission_id] RESIDENT [abatement_techniques];
+Map_abatement_techniques_idx:
+MAPPING LOAD [abatement_technique_id], [abatement_techniques_idx] RESIDENT [abatement_techniques];
+
+Map_combustion_units_sub:
+MAPPING LOAD [combustion_unit_id], [submission_id] RESIDENT [combustion_units];
+Map_combustion_units_idx:
+MAPPING LOAD [combustion_unit_id], [combustion_units_idx] RESIDENT [combustion_units];
+
+Map_emission_points_sub:
+MAPPING LOAD [emission_point_id], [submission_id] RESIDENT [emission_points];
+Map_emission_points_idx:
+MAPPING LOAD [emission_point_id], [emission_points_idx] RESIDENT [emission_points];
+
+Map_waste_water_discharges_sub:
+MAPPING LOAD [waste_water_discharge_id], [submission_id] RESIDENT [waste_water_discharges];
+Map_waste_water_discharges_idx:
+MAPPING LOAD [waste_water_discharge_id], [waste_water_discharges_idx] RESIDENT [waste_water_discharges];
+
+Map_emission_points_desc:
+MAPPING LOAD [emission_point_id], [emission_points_waste_gas_desc] RESIDENT [emission_points];
+
+// Bornes d'anomalie, calculées ici et non dans un graphique : le seuil
+// d'un polluant dépend de toute la distribution du panel, donc d'un
+// balayage complet. Le refaire à chaque rafraîchissement d'écran coûte
+// cher pour un résultat qui ne change qu'au rechargement.
+//
+// P75 + 3 × écart interquartile : la clôture de Tukey, élargie de 1,5 à 3
+// pour ne signaler que l'aberration franche. Une collecte volontaire a
+// des valeurs légitimement dispersées ; à 1,5 on noierait le secrétariat
+// sous des alertes qui ne sont que la réalité du secteur.
+//
+// Groupé par polluant ET par type de cheminée : 10 mg/Nm³ de
+// formaldéhyde n'a pas le même sens sur un séchoir au bois recyclé et
+// sur un filtre de ponçage (voir le mouvement 04 du parcours).
+EpConcTmp:
+LOAD
+	[emission_point_pollutants_code] & '|' & ApplyMap('Map_emission_points_desc', [emission_point_id], '?') as [sv_gkey_tmp],
+	[emission_point_pollutants_conc] as [conc_tmp]
+RESIDENT [emission_point_pollutants]
+WHERE Len([emission_point_pollutants_conc]) > 0;
+
+FenceMap:
+MAPPING LOAD
+	[sv_gkey_tmp],
+	Fractile([conc_tmp], 0.75) + 3 * (Fractile([conc_tmp], 0.75) - Fractile([conc_tmp], 0.25))
+RESIDENT EpConcTmp
+GROUP BY [sv_gkey_tmp];
+
+DROP TABLE EpConcTmp;
+
+// Chaque valeur est passée par If(IsNull(...), '', ...) et non chargée
+// telle quelle. CROSSTABLE n'émet AUCUNE ligne pour une cellule nulle :
+// un champ laissé vide par l'opérateur n'existerait tout simplement pas
+// dans la table longue, et la feuille ne pourrait pas le signaler — elle
+// ne saurait pas distinguer « rempli » de « jamais rempli », qui est
+// pourtant la première chose que le contrôle qualité cherche.
+//
+// NullAsValue a été essayé d'abord, et ne suffit pas : la ligne est
+// écartée au pivot, avant que la conversion ne s'applique.
+//
+// La valeur n'est PAS passée par Text() ici : cela détruirait sa part
+// numérique, et sv_num, calculé dans la passe finale, resterait vide
+// pour toutes les réponses chiffrées. La conversion en texte se fait en
+// fin de course, quand la valeur numérique a déjà été prélevée.
+
+// contacts — page 0
+[submission_values_raw]:
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	0 as [sv_page],
+	'contacts' as [sv_section],
+	null() as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([contacts_contact_company]), '', [contacts_contact_company]) as [contact_company],
+	If(IsNull([contacts_contact_name]), '', [contacts_contact_name]) as [contact_name],
+	If(IsNull([contacts_contact_job_title]), '', [contacts_contact_job_title]) as [contact_job_title],
+	If(IsNull([contacts_contact_email]), '', [contacts_contact_email]) as [contact_email],
+	If(IsNull([contacts_contact_telephone]), '', [contacts_contact_telephone]) as [contact_telephone],
+	If(IsNull([contacts_contact_comments]), '', [contacts_contact_comments]) as [contact_comments],
+	If(IsNull([contacts_twg_ms_state]), '', [contacts_twg_ms_state]) as [twg_ms_state],
+	If(IsNull([contacts_twg_ms_organisation]), '', [contacts_twg_ms_organisation]) as [twg_ms_organisation],
+	If(IsNull([contacts_twg_ms_name]), '', [contacts_twg_ms_name]) as [twg_ms_name],
+	If(IsNull([contacts_twg_ms_job_title]), '', [contacts_twg_ms_job_title]) as [twg_ms_job_title],
+	If(IsNull([contacts_twg_ms_email]), '', [contacts_twg_ms_email]) as [twg_ms_email],
+	If(IsNull([contacts_twg_ms_telephone]), '', [contacts_twg_ms_telephone]) as [twg_ms_telephone],
+	If(IsNull([contacts_twg_ngo_company]), '', [contacts_twg_ngo_company]) as [twg_ngo_company],
+	If(IsNull([contacts_twg_ngo_name]), '', [contacts_twg_ngo_name]) as [twg_ngo_name],
+	If(IsNull([contacts_twg_ngo_job_title]), '', [contacts_twg_ngo_job_title]) as [twg_ngo_job_title],
+	If(IsNull([contacts_twg_ngo_email]), '', [contacts_twg_ngo_email]) as [twg_ngo_email],
+	If(IsNull([contacts_twg_ngo_telephone]), '', [contacts_twg_ngo_telephone]) as [twg_ngo_telephone]
+RESIDENT [contacts];
+
+// general_info — page 1
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	1 as [sv_page],
+	'general_info' as [sv_section],
+	null() as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([general_info_plant_name]), '', [general_info_plant_name]) as [plant_name],
+	If(IsNull([general_info_production_started]), '', [general_info_production_started]) as [production_started],
+	If(IsNull([general_info_location_city]), '', [general_info_location_city]) as [location_city],
+	If(IsNull([general_info_location_country]), '', [general_info_location_country]) as [location_country],
+	If(IsNull([general_info_company]), '', [general_info_company]) as [company],
+	If(IsNull([general_info_ref_year]), '', [general_info_ref_year]) as [ref_year],
+	If(IsNull([general_info_comments]), '', [general_info_comments]) as [comments]
+RESIDENT [general_info];
+
+// plant_products — page 1
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	1 as [sv_page],
+	'plant_products' as [sv_section],
+	[plant_products_idx] as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([plant_products_type]), '', [plant_products_type]) as [type],
+	If(IsNull([plant_products_addinfo]), '', [plant_products_addinfo]) as [addinfo],
+	If(IsNull([plant_products_qty]), '', [plant_products_qty]) as [qty],
+	If(IsNull([plant_products_unit]), '', [plant_products_unit]) as [unit],
+	If(IsNull([plant_products_daily]), '', [plant_products_daily]) as [daily]
+RESIDENT [plant_products];
+
+// site_activities — page 1
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	1 as [sv_page],
+	'site_activities' as [sv_section],
+	null() as [sv_instance],
+	[site_activities_ref_label] as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([site_activities_present]), '', [site_activities_present]) as [present],
+	If(IsNull([site_activities_ippc]), '', [site_activities_ippc]) as [ippc],
+	If(IsNull([site_activities_capacity]), '', [site_activities_capacity]) as [capacity]
+RESIDENT [site_activities];
+
+// site_activity_units — page 1
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	1 as [sv_page],
+	'site_activity_units' as [sv_section],
+	null() as [sv_instance],
+	[site_activity_units_ref_label] as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([site_activity_units_unit]), '', [site_activity_units_unit]) as [unit]
+RESIDENT [site_activity_units];
+
+// site_activity_other_specify — page 1
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	1 as [sv_page],
+	'site_activity_other_specify' as [sv_section],
+	null() as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([site_activity_other_specify_act_other_specify_label]), '', [site_activity_other_specify_act_other_specify_label]) as [act_other_specify_label]
+RESIDENT [site_activity_other_specify];
+
+// plant_layout_section — page 2
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	2 as [sv_page],
+	'plant_layout_section' as [sv_section],
+	null() as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([plant_layout_section_ref_year]), '', [plant_layout_section_ref_year]) as [ref_year],
+	If(IsNull([plant_layout_section_s21_comments]), '', [plant_layout_section_s21_comments]) as [s21_comments],
+	If(IsNull([plant_layout_section_s22_comments]), '', [plant_layout_section_s22_comments]) as [s22_comments],
+	If(IsNull([plant_layout_section_s23_present]), '', [plant_layout_section_s23_present]) as [s23_present],
+	If(IsNull([plant_layout_section_s23_hours]), '', [plant_layout_section_s23_hours]) as [s23_hours],
+	If(IsNull([plant_layout_section_s23_capacity]), '', [plant_layout_section_s23_capacity]) as [s23_capacity],
+	If(IsNull([plant_layout_section_s23_chan_air]), '', [plant_layout_section_s23_chan_air]) as [s23_chan_air],
+	If(IsNull([plant_layout_section_s23_chan_treated]), '', [plant_layout_section_s23_chan_treated]) as [s23_chan_treated],
+	If(IsNull([plant_layout_section_s23_emit_limit]), '', [plant_layout_section_s23_emit_limit]) as [s23_emit_limit],
+	If(IsNull([plant_layout_section_s23_dust_method]), '', [plant_layout_section_s23_dust_method]) as [s23_dust_method],
+	If(IsNull([plant_layout_section_s23_monitoring]), '', [plant_layout_section_s23_monitoring]) as [s23_monitoring],
+	If(IsNull([plant_layout_section_s23_comments]), '', [plant_layout_section_s23_comments]) as [s23_comments],
+	If(IsNull([plant_layout_section_s24_desc]), '', [plant_layout_section_s24_desc]) as [s24_desc],
+	If(IsNull([plant_layout_section_s24_chan_air]), '', [plant_layout_section_s24_chan_air]) as [s24_chan_air],
+	If(IsNull([plant_layout_section_s24_chan_treated]), '', [plant_layout_section_s24_chan_treated]) as [s24_chan_treated],
+	If(IsNull([plant_layout_section_s24_dust_method]), '', [plant_layout_section_s24_dust_method]) as [s24_dust_method],
+	If(IsNull([plant_layout_section_s24_comments]), '', [plant_layout_section_s24_comments]) as [s24_comments],
+	If(IsNull([plant_layout_section_s25_desc]), '', [plant_layout_section_s25_desc]) as [s25_desc],
+	If(IsNull([plant_layout_section_s25_chan_air]), '', [plant_layout_section_s25_chan_air]) as [s25_chan_air],
+	If(IsNull([plant_layout_section_s25_chan_treated]), '', [plant_layout_section_s25_chan_treated]) as [s25_chan_treated],
+	If(IsNull([plant_layout_section_s25_dust_method]), '', [plant_layout_section_s25_dust_method]) as [s25_dust_method],
+	If(IsNull([plant_layout_section_s25_comments]), '', [plant_layout_section_s25_comments]) as [s25_comments]
+RESIDENT [plant_layout_section];
+
+// raw_material_storage — page 2
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	2 as [sv_page],
+	'raw_material_storage' as [sv_section],
+	null() as [sv_instance],
+	[raw_material_storage_ref_label] as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([raw_material_storage_pct]), '', [raw_material_storage_pct]) as [pct],
+	If(IsNull([raw_material_storage_cap]), '', [raw_material_storage_cap]) as [cap],
+	If(IsNull([raw_material_storage_area]), '', [raw_material_storage_area]) as [area]
+RESIDENT [raw_material_storage];
+
+// wood_prep_operations — page 2
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	2 as [sv_page],
+	'wood_prep_operations' as [sv_section],
+	null() as [sv_instance],
+	[wood_prep_operations_ref_label] as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([wood_prep_operations_process_desc]), '', [wood_prep_operations_process_desc]) as [process_desc],
+	If(IsNull([wood_prep_operations_prod_t_batch]), '', [wood_prep_operations_prod_t_batch]) as [prod_t_batch],
+	If(IsNull([wood_prep_operations_wood_dry]), '', [wood_prep_operations_wood_dry]) as [wood_dry],
+	If(IsNull([wood_prep_operations_airflow]), '', [wood_prep_operations_airflow]) as [airflow],
+	If(IsNull([wood_prep_operations_chan_air]), '', [wood_prep_operations_chan_air]) as [chan_air],
+	If(IsNull([wood_prep_operations_chan_treated]), '', [wood_prep_operations_chan_treated]) as [chan_treated],
+	If(IsNull([wood_prep_operations_emit_limit]), '', [wood_prep_operations_emit_limit]) as [emit_limit],
+	If(IsNull([wood_prep_operations_dust_method]), '', [wood_prep_operations_dust_method]) as [dust_method],
+	If(IsNull([wood_prep_operations_monitoring]), '', [wood_prep_operations_monitoring]) as [monitoring]
+RESIDENT [wood_prep_operations];
+
+// wood_prep_param_comments — page 2
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	2 as [sv_page],
+	'wood_prep_param_comments' as [sv_section],
+	null() as [sv_instance],
+	[wood_prep_param_comments_ref_label] as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([wood_prep_param_comments_comments]), '', [wood_prep_param_comments_comments]) as [comments]
+RESIDENT [wood_prep_param_comments];
+
+// raw_materials_section — page 3
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	3 as [sv_page],
+	'raw_materials_section' as [sv_section],
+	null() as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([raw_materials_section_ref_year]), '', [raw_materials_section_ref_year]) as [ref_year],
+	If(IsNull([raw_materials_section_s32_comments]), '', [raw_materials_section_s32_comments]) as [s32_comments]
+RESIDENT [raw_materials_section];
+
+// raw_materials — page 3
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	3 as [sv_page],
+	'raw_materials' as [sv_section],
+	null() as [sv_instance],
+	[raw_materials_ref_label] as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([raw_materials_pct]), '', [raw_materials_pct]) as [pct],
+	If(IsNull([raw_materials_species]), '', [raw_materials_species]) as [species],
+	If(IsNull([raw_materials_source]), '', [raw_materials_source]) as [source]
+RESIDENT [raw_materials];
+
+// raw_material_specify — page 3
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	3 as [sv_page],
+	'raw_material_specify' as [sv_section],
+	null() as [sv_instance],
+	[raw_material_specify_ref_label] as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([raw_material_specify_specify]), '', [raw_material_specify_specify]) as [specify]
+RESIDENT [raw_material_specify];
+
+// resins — page 3
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	3 as [sv_page],
+	'resins' as [sv_section],
+	[resins_idx] as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([resins_type]), '', [resins_type]) as [type],
+	If(IsNull([resins_pct]), '', [resins_pct]) as [pct],
+	If(IsNull([resins_comments]), '', [resins_comments]) as [comments]
+RESIDENT [resins];
+
+// hardeners — page 3
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	3 as [sv_page],
+	'hardeners' as [sv_section],
+	[hardeners_idx] as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([hardeners_type]), '', [hardeners_type]) as [type],
+	If(IsNull([hardeners_comments]), '', [hardeners_comments]) as [comments]
+RESIDENT [hardeners];
+
+// additives — page 3
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	3 as [sv_page],
+	'additives' as [sv_section],
+	null() as [sv_instance],
+	[additives_ref_label] as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([additives_type]), '', [additives_type]) as [type],
+	If(IsNull([additives_comments]), '', [additives_comments]) as [comments]
+RESIDENT [additives];
+
+// energy_section — page 4
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	4 as [sv_page],
+	'energy_section' as [sv_section],
+	null() as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([energy_section_ref_year]), '', [energy_section_ref_year]) as [ref_year],
+	If(IsNull([energy_section_comments]), '', [energy_section_comments]) as [comments],
+	If(IsNull([energy_section_s41_diagram_ref]), '', [energy_section_s41_diagram_ref]) as [s41_diagram_ref],
+	If(IsNull([energy_section_s43_steam]), '', [energy_section_s43_steam]) as [s43_steam],
+	If(IsNull([energy_section_s43_hot_oil]), '', [energy_section_s43_hot_oil]) as [s43_hot_oil],
+	If(IsNull([energy_section_s43_fluegas]), '', [energy_section_s43_fluegas]) as [s43_fluegas],
+	If(IsNull([energy_section_s43_other]), '', [energy_section_s43_other]) as [s43_other],
+	If(IsNull([energy_section_s43_cold_startups]), '', [energy_section_s43_cold_startups]) as [s43_cold_startups],
+	If(IsNull([energy_section_s43_warm_startups]), '', [energy_section_s43_warm_startups]) as [s43_warm_startups],
+	If(IsNull([energy_section_s43_maintenance_desc]), '', [energy_section_s43_maintenance_desc]) as [s43_maintenance_desc]
+RESIDENT [energy_section];
+
+// combustion_units — page 4
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	4 as [sv_page],
+	'combustion_units' as [sv_section],
+	[combustion_units_idx] as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([combustion_units_general_process]), '', [combustion_units_general_process]) as [general_process],
+	If(IsNull([combustion_units_equip_type]), '', [combustion_units_equip_type]) as [equip_type],
+	If(IsNull([combustion_units_boiler_detail]), '', [combustion_units_boiler_detail]) as [boiler_detail],
+	If(IsNull([combustion_units_engine_ignition]), '', [combustion_units_engine_ignition]) as [engine_ignition],
+	If(IsNull([combustion_units_chp]), '', [combustion_units_chp]) as [chp],
+	If(IsNull([combustion_units_suppl_fire]), '', [combustion_units_suppl_fire]) as [suppl_fire],
+	If(IsNull([combustion_units_dual_fuel]), '', [combustion_units_dual_fuel]) as [dual_fuel],
+	If(IsNull([combustion_units_install_year]), '', [combustion_units_install_year]) as [install_year],
+	If(IsNull([combustion_units_thermal_input]), '', [combustion_units_thermal_input]) as [thermal_input],
+	If(IsNull([combustion_units_energy_output]), '', [combustion_units_energy_output]) as [energy_output],
+	If(IsNull([combustion_units_hours_normal]), '', [combustion_units_hours_normal]) as [hours_normal],
+	If(IsNull([combustion_units_hours_special]), '', [combustion_units_hours_special]) as [hours_special],
+	If(IsNull([combustion_units_output_1]), '', [combustion_units_output_1]) as [output_1],
+	If(IsNull([combustion_units_output_2]), '', [combustion_units_output_2]) as [output_2],
+	If(IsNull([combustion_units_output_3]), '', [combustion_units_output_3]) as [output_3],
+	If(IsNull([combustion_units_output_4]), '', [combustion_units_output_4]) as [output_4],
+	If(IsNull([combustion_units_output_5]), '', [combustion_units_output_5]) as [output_5]
+RESIDENT [combustion_units];
+
+// combustion_unit_fuels — page 4
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	ApplyMap('Map_combustion_units_sub', [combustion_unit_id]) as [submission_id],
+	4 as [sv_page],
+	'combustion_unit_fuels' as [sv_section],
+	ApplyMap('Map_combustion_units_idx', [combustion_unit_id]) as [sv_instance],
+	[combustion_unit_fuels_ref_label] as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([combustion_unit_fuels_pct]), '', [combustion_unit_fuels_pct]) as [pct],
+	If(IsNull([combustion_unit_fuels_description]), '', [combustion_unit_fuels_description]) as [description]
+RESIDENT [combustion_unit_fuels];
+
+// press_dryer_section — page 5
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	5 as [sv_page],
+	'press_dryer_section' as [sv_section],
+	null() as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([press_dryer_section_comments]), '', [press_dryer_section_comments]) as [comments]
+RESIDENT [press_dryer_section];
+
+// dryers — page 5
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	5 as [sv_page],
+	'dryers' as [sv_section],
+	[dryers_idx] as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([dryers_ref_year]), '', [dryers_ref_year]) as [ref_year],
+	If(IsNull([dryers_main_type]), '', [dryers_main_type]) as [main_type],
+	If(IsNull([dryers_system_desc]), '', [dryers_system_desc]) as [system_desc],
+	If(IsNull([dryers_product]), '', [dryers_product]) as [product],
+	If(IsNull([dryers_install_year]), '', [dryers_install_year]) as [install_year],
+	If(IsNull([dryers_temp_min]), '', [dryers_temp_min]) as [temp_min],
+	If(IsNull([dryers_temp_max]), '', [dryers_temp_max]) as [temp_max],
+	If(IsNull([dryers_outlet_temp]), '', [dryers_outlet_temp]) as [outlet_temp],
+	If(IsNull([dryers_mc_before]), '', [dryers_mc_before]) as [mc_before],
+	If(IsNull([dryers_mc_after]), '', [dryers_mc_after]) as [mc_after],
+	If(IsNull([dryers_product_dried]), '', [dryers_product_dried]) as [product_dried],
+	If(IsNull([dryers_drying_rate]), '', [dryers_drying_rate]) as [drying_rate],
+	If(IsNull([dryers_residence_val]), '', [dryers_residence_val]) as [residence_val],
+	If(IsNull([dryers_residence_unit]), '', [dryers_residence_unit]) as [residence_unit],
+	If(IsNull([dryers_recirculation]), '', [dryers_recirculation]) as [recirculation],
+	If(IsNull([dryers_heat_regained]), '', [dryers_heat_regained]) as [heat_regained]
+RESIDENT [dryers];
+
+// presses — page 5
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	5 as [sv_page],
+	'presses' as [sv_section],
+	[presses_idx] as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([presses_ref_year]), '', [presses_ref_year]) as [ref_year],
+	If(IsNull([presses_main_type]), '', [presses_main_type]) as [main_type],
+	If(IsNull([presses_system_desc]), '', [presses_system_desc]) as [system_desc],
+	If(IsNull([presses_product]), '', [presses_product]) as [product],
+	If(IsNull([presses_install_year]), '', [presses_install_year]) as [install_year],
+	If(IsNull([presses_output]), '', [presses_output]) as [output],
+	If(IsNull([presses_factor]), '', [presses_factor]) as [factor],
+	If(IsNull([presses_temp]), '', [presses_temp]) as [temp],
+	If(IsNull([presses_pressure]), '', [presses_pressure]) as [pressure],
+	If(IsNull([presses_exhaust_collected]), '', [presses_exhaust_collected]) as [exhaust_collected],
+	If(IsNull([presses_abatement]), '', [presses_abatement]) as [abatement]
+RESIDENT [presses];
+
+// dust_section — page 6
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	6 as [sv_page],
+	'dust_section' as [sv_section],
+	null() as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([dust_section_s62_equip_desc]), '', [dust_section_s62_equip_desc]) as [s62_equip_desc],
+	If(IsNull([dust_section_s62_collected_dust]), '', [dust_section_s62_collected_dust]) as [s62_collected_dust],
+	If(IsNull([dust_section_s62_dust_fate]), '', [dust_section_s62_dust_fate]) as [s62_dust_fate],
+	If(IsNull([dust_section_s62_energy_recovery_pct]), '', [dust_section_s62_energy_recovery_pct]) as [s62_energy_recovery_pct],
+	If(IsNull([dust_section_s62_monitoring]), '', [dust_section_s62_monitoring]) as [s62_monitoring],
+	If(IsNull([dust_section_s62_control_measures]), '', [dust_section_s62_control_measures]) as [s62_control_measures],
+	If(IsNull([dust_section_s62_comments]), '', [dust_section_s62_comments]) as [s62_comments]
+RESIDENT [dust_section];
+
+// abatement_techniques — page 6
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	6 as [sv_page],
+	'abatement_techniques' as [sv_section],
+	[abatement_techniques_idx] as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([abatement_techniques_name]), '', [abatement_techniques_name]) as [name],
+	If(IsNull([abatement_techniques_install_year]), '', [abatement_techniques_install_year]) as [install_year],
+	If(IsNull([abatement_techniques_annex_ref]), '', [abatement_techniques_annex_ref]) as [annex_ref],
+	If(IsNull([abatement_techniques_design_features]), '', [abatement_techniques_design_features]) as [design_features],
+	If(IsNull([abatement_techniques_removal_efficiency]), '', [abatement_techniques_removal_efficiency]) as [removal_efficiency],
+	If(IsNull([abatement_techniques_comments]), '', [abatement_techniques_comments]) as [comments]
+RESIDENT [abatement_techniques];
+
+// abatement_technique_sources — page 6
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	ApplyMap('Map_abatement_techniques_sub', [abatement_technique_id]) as [submission_id],
+	6 as [sv_page],
+	'abatement_technique_sources' as [sv_section],
+	ApplyMap('Map_abatement_techniques_idx', [abatement_technique_id]) as [sv_instance],
+	[abatement_technique_sources_ref_label] as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([abatement_technique_sources_yn]), '', [abatement_technique_sources_yn]) as [yn],
+	If(IsNull([abatement_technique_sources_spec]), '', [abatement_technique_sources_spec]) as [spec]
+RESIDENT [abatement_technique_sources];
+
+// abatement_technique_flows — page 6
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	ApplyMap('Map_abatement_techniques_sub', [abatement_technique_id]) as [submission_id],
+	6 as [sv_page],
+	'abatement_technique_flows' as [sv_section],
+	ApplyMap('Map_abatement_techniques_idx', [abatement_technique_id]) as [sv_instance],
+	[abatement_technique_flows_ref_label] as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([abatement_technique_flows_val]), '', [abatement_technique_flows_val]) as [val],
+	If(IsNull([abatement_technique_flows_comment]), '', [abatement_technique_flows_comment]) as [comment]
+RESIDENT [abatement_technique_flows];
+
+// emission_points — page 7
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	7 as [sv_page],
+	'emission_points' as [sv_section],
+	[emission_points_idx] as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([emission_points_point_ref]), '', [emission_points_point_ref]) as [point_ref],
+	If(IsNull([emission_points_ref_year]), '', [emission_points_ref_year]) as [ref_year],
+	If(IsNull([emission_points_refcond]), '', [emission_points_refcond]) as [refcond],
+	If(IsNull([emission_points_waste_gas_desc]), '', [emission_points_waste_gas_desc]) as [waste_gas_desc],
+	If(IsNull([emission_points_comments]), '', [emission_points_comments]) as [comments],
+	If(IsNull([emission_points_cross_section]), '', [emission_points_cross_section]) as [cross_section],
+	If(IsNull([emission_points_air_pressure]), '', [emission_points_air_pressure]) as [air_pressure],
+	If(IsNull([emission_points_temp_dry]), '', [emission_points_temp_dry]) as [temp_dry],
+	If(IsNull([emission_points_temp_wet]), '', [emission_points_temp_wet]) as [temp_wet],
+	If(IsNull([emission_points_o2]), '', [emission_points_o2]) as [o2],
+	If(IsNull([emission_points_co2]), '', [emission_points_co2]) as [co2],
+	If(IsNull([emission_points_co_gas]), '', [emission_points_co_gas]) as [co_gas],
+	If(IsNull([emission_points_inert]), '', [emission_points_inert]) as [inert],
+	If(IsNull([emission_points_moisture]), '', [emission_points_moisture]) as [moisture],
+	If(IsNull([emission_points_density_std]), '', [emission_points_density_std]) as [density_std],
+	If(IsNull([emission_points_flow_actual]), '', [emission_points_flow_actual]) as [flow_actual],
+	If(IsNull([emission_points_flow_std]), '', [emission_points_flow_std]) as [flow_std]
+RESIDENT [emission_points];
+
+// emission_point_pollutants — page 7
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	ApplyMap('Map_emission_points_sub', [emission_point_id]) as [submission_id],
+	7 as [sv_page],
+	'emission_point_pollutants' as [sv_section],
+	ApplyMap('Map_emission_points_idx', [emission_point_id]) as [sv_instance],
+	[emission_point_pollutants_ref_label] as [sv_code],
+	[emission_point_pollutants_code] & '|' & ApplyMap('Map_emission_points_desc', [emission_point_id], '?') as [sv_gkey],
+	If(IsNull([emission_point_pollutants_conc]), '', [emission_point_pollutants_conc]) as [conc],
+	If(IsNull([emission_point_pollutants_method]), '', [emission_point_pollutants_method]) as [method],
+	If(IsNull([emission_point_pollutants_t_year]), '', [emission_point_pollutants_t_year]) as [t_year],
+	If(IsNull([emission_point_pollutants_short_term]), '', [emission_point_pollutants_short_term]) as [short_term],
+	If(IsNull([emission_point_pollutants_short_val]), '', [emission_point_pollutants_short_val]) as [short_val],
+	If(IsNull([emission_point_pollutants_limit_val]), '', [emission_point_pollutants_limit_val]) as [limit_val]
+RESIDENT [emission_point_pollutants];
+
+// waste_water_discharges — page 8
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	8 as [sv_page],
+	'waste_water_discharges' as [sv_section],
+	[waste_water_discharges_idx] as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([waste_water_discharges_discharge_id]), '', [waste_water_discharges_discharge_id]) as [discharge_id],
+	If(IsNull([waste_water_discharges_ref_year]), '', [waste_water_discharges_ref_year]) as [ref_year],
+	If(IsNull([waste_water_discharges_treated]), '', [waste_water_discharges_treated]) as [treated],
+	If(IsNull([waste_water_discharges_wwtp_desc]), '', [waste_water_discharges_wwtp_desc]) as [wwtp_desc],
+	If(IsNull([waste_water_discharges_sludge_fate]), '', [waste_water_discharges_sludge_fate]) as [sludge_fate]
+RESIDENT [waste_water_discharges];
+
+// waste_water_pollutants — page 8
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	ApplyMap('Map_waste_water_discharges_sub', [waste_water_discharge_id]) as [submission_id],
+	8 as [sv_page],
+	'waste_water_pollutants' as [sv_section],
+	ApplyMap('Map_waste_water_discharges_idx', [waste_water_discharge_id]) as [sv_instance],
+	[waste_water_pollutants_ref_label] as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([waste_water_pollutants_conc]), '', [waste_water_pollutants_conc]) as [conc],
+	If(IsNull([waste_water_pollutants_freq]), '', [waste_water_pollutants_freq]) as [freq],
+	If(IsNull([waste_water_pollutants_pos]), '', [waste_water_pollutants_pos]) as [pos],
+	If(IsNull([waste_water_pollutants_comments]), '', [waste_water_pollutants_comments]) as [comments]
+RESIDENT [waste_water_pollutants];
+
+// waste_water_sources — page 8
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	ApplyMap('Map_waste_water_discharges_sub', [waste_water_discharge_id]) as [submission_id],
+	8 as [sv_page],
+	'waste_water_sources' as [sv_section],
+	ApplyMap('Map_waste_water_discharges_idx', [waste_water_discharge_id]) as [sv_instance],
+	[waste_water_sources_ref_label] as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([waste_water_sources_vol]), '', [waste_water_sources_vol]) as [vol],
+	If(IsNull([waste_water_sources_comment]), '', [waste_water_sources_comment]) as [comment]
+RESIDENT [waste_water_sources];
+
+// waste_section — page 9
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	9 as [sv_page],
+	'waste_section' as [sv_section],
+	null() as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([waste_section_waste_comments]), '', [waste_section_waste_comments]) as [waste_comments],
+	If(IsNull([waste_section_waste_bat_techniques]), '', [waste_section_waste_bat_techniques]) as [waste_bat_techniques]
+RESIDENT [waste_section];
+
+// waste_streams — page 9
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	9 as [sv_page],
+	'waste_streams' as [sv_section],
+	[waste_streams_idx] as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([waste_streams_description]), '', [waste_streams_description]) as [description],
+	If(IsNull([waste_streams_ewc]), '', [waste_streams_ewc]) as [ewc],
+	If(IsNull([waste_streams_source]), '', [waste_streams_source]) as [source],
+	If(IsNull([waste_streams_qty]), '', [waste_streams_qty]) as [qty],
+	If(IsNull([waste_streams_dest]), '', [waste_streams_dest]) as [dest]
+RESIDENT [waste_streams];
+
+// water_consumption — page 10
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	10 as [sv_page],
+	'water_consumption' as [sv_section],
+	null() as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([water_consumption_wc_process]), '', [water_consumption_wc_process]) as [wc_process],
+	If(IsNull([water_consumption_wc_cooling]), '', [water_consumption_wc_cooling]) as [wc_cooling],
+	If(IsNull([water_consumption_wc_steam]), '', [water_consumption_wc_steam]) as [wc_steam],
+	If(IsNull([water_consumption_wc_sanitary]), '', [water_consumption_wc_sanitary]) as [wc_sanitary],
+	If(IsNull([water_consumption_wc_other]), '', [water_consumption_wc_other]) as [wc_other],
+	If(IsNull([water_consumption_wc_refining_total]), '', [water_consumption_wc_refining_total]) as [wc_refining_total],
+	If(IsNull([water_consumption_wc_refining_recycled]), '', [water_consumption_wc_refining_recycled]) as [wc_refining_recycled],
+	If(IsNull([water_consumption_wc_recycling_savings]), '', [water_consumption_wc_recycling_savings]) as [wc_recycling_savings],
+	If(IsNull([water_consumption_wc_bat_techniques]), '', [water_consumption_wc_bat_techniques]) as [wc_bat_techniques],
+	If(IsNull([water_consumption_wc_comments]), '', [water_consumption_wc_comments]) as [wc_comments]
+RESIDENT [water_consumption];
+
+// bat_candidate — page 11
+CROSSTABLE([sv_field], [sv_value], 6)
+LOAD
+	[submission_id],
+	11 as [sv_page],
+	'bat_candidate' as [sv_section],
+	null() as [sv_instance],
+	null() as [sv_code],
+	null() as [sv_gkey],
+	If(IsNull([bat_candidate_bat_plant_name]), '', [bat_candidate_bat_plant_name]) as [bat_plant_name],
+	If(IsNull([bat_candidate_bat_name]), '', [bat_candidate_bat_name]) as [bat_name],
+	If(IsNull([bat_candidate_bat_tech_desc]), '', [bat_candidate_bat_tech_desc]) as [bat_tech_desc],
+	If(IsNull([bat_candidate_bat_install_year]), '', [bat_candidate_bat_install_year]) as [bat_install_year],
+	If(IsNull([bat_candidate_bat_rd_level]), '', [bat_candidate_bat_rd_level]) as [bat_rd_level],
+	If(IsNull([bat_candidate_bat_cat_rawmat]), '', [bat_candidate_bat_cat_rawmat]) as [bat_cat_rawmat],
+	If(IsNull([bat_candidate_bat_cat_energy]), '', [bat_candidate_bat_cat_energy]) as [bat_cat_energy],
+	If(IsNull([bat_candidate_bat_cat_air]), '', [bat_candidate_bat_cat_air]) as [bat_cat_air],
+	If(IsNull([bat_candidate_bat_cat_water]), '', [bat_candidate_bat_cat_water]) as [bat_cat_water],
+	If(IsNull([bat_candidate_bat_cat_primary_other]), '', [bat_candidate_bat_cat_primary_other]) as [bat_cat_primary_other],
+	If(IsNull([bat_candidate_bat_cat_emissions]), '', [bat_candidate_bat_cat_emissions]) as [bat_cat_emissions],
+	If(IsNull([bat_candidate_bat_cat_ww]), '', [bat_candidate_bat_cat_ww]) as [bat_cat_ww],
+	If(IsNull([bat_candidate_bat_cat_solid]), '', [bat_candidate_bat_cat_solid]) as [bat_cat_solid],
+	If(IsNull([bat_candidate_bat_cat_secondary_other]), '', [bat_candidate_bat_cat_secondary_other]) as [bat_cat_secondary_other],
+	If(IsNull([bat_candidate_bat_env_air]), '', [bat_candidate_bat_env_air]) as [bat_env_air],
+	If(IsNull([bat_candidate_bat_env_water]), '', [bat_candidate_bat_env_water]) as [bat_env_water],
+	If(IsNull([bat_candidate_bat_env_energy]), '', [bat_candidate_bat_env_energy]) as [bat_env_energy],
+	If(IsNull([bat_candidate_bat_env_other]), '', [bat_candidate_bat_env_other]) as [bat_env_other],
+	If(IsNull([bat_candidate_bat_cross_media]), '', [bat_candidate_bat_cross_media]) as [bat_cross_media],
+	If(IsNull([bat_candidate_bat_applicability]), '', [bat_candidate_bat_applicability]) as [bat_applicability],
+	If(IsNull([bat_candidate_bat_invest_cost]), '', [bat_candidate_bat_invest_cost]) as [bat_invest_cost],
+	If(IsNull([bat_candidate_bat_oper_cost]), '', [bat_candidate_bat_oper_cost]) as [bat_oper_cost],
+	If(IsNull([bat_candidate_bat_cost_effectiveness]), '', [bat_candidate_bat_cost_effectiveness]) as [bat_cost_effectiveness],
+	If(IsNull([bat_candidate_bat_reference_plants]), '', [bat_candidate_bat_reference_plants]) as [bat_reference_plants],
+	If(IsNull([bat_candidate_bat_references]), '', [bat_candidate_bat_references]) as [bat_references],
+	If(IsNull([bat_candidate_bat_tech_comments]), '', [bat_candidate_bat_tech_comments]) as [bat_tech_comments]
+RESIDENT [bat_candidate];
+
+// Libellé de page, valeur numérique quand il y en a une, et état.
+PageTitleMap:
+MAPPING LOAD * INLINE [
+	page, title
+	0, 0. Cover & Contact
+	1, 1. General Information
+	2, 2. Plant Layout
+	3, 3. Raw Materials
+	4, 4. Energy Production
+	5, 5. Dryer & Press Line
+	6, 6. Air Abatement
+	7, 7. Air Emissions
+	8, 8. Water Emissions
+	9, 9. Solid Residues
+	10, 10. Water Consumption
+	11, 11. BAT Candidate
+];
+
+[submission_values]:
+LOAD
+	[submission_id],
+	[sv_page],
+	ApplyMap('PageTitleMap', [sv_page], [sv_page]) as [sv_page_label],
+	[sv_section],
+	[sv_instance],
+	[sv_code],
+	[sv_field],
+	// Un tiret, et non la chaîne vide. CROSSTABLE empile dans une seule
+	// colonne les valeurs de trente-cinq tables ; elle finit interprétée
+	// comme numérique, et une chaîne vide s'y affiche « NaN » — ce que le
+	// lecteur prendrait pour une erreur de calcul plutôt que pour une
+	// réponse manquante. Le tiret est déduit du test de longueur, jamais
+	// posé à la source : rien ne dépend de sa présence.
+	If(Len(Trim([sv_value])) = 0, '—', Text([sv_value])) as [sv_value],
+	If(IsNum([sv_value]), Num([sv_value])) as [sv_num],
+	If(Len(Trim([sv_value])) = 0, 0, 1) as [sv_filled],
+	// Un champ vide est d'abord un champ vide : le signaler comme hors
+	// plage n'aurait pas de sens, et masquerait la seule chose à faire,
+	// qui est de retourner le demander à l'opérateur.
+	If(Len(Trim([sv_value])) = 0, 'VIDE',
+		If(Len([sv_gkey]) > 0 and [sv_field] = 'conc'
+			and Num([sv_value]) > ApplyMap('FenceMap', [sv_gkey], 1E15),
+			'HORS PLAGE', 'OK')) as [sv_state]
+RESIDENT [submission_values_raw];
+
+DROP TABLE [submission_values_raw];
+
+SvSectionCheck:
+LOAD Count(DISTINCT [sv_section]) as [n] RESIDENT [submission_values];
+LET vSvExpected = 35;
+LET vSvLoaded = Peek('n', 0, 'SvSectionCheck');
+DROP TABLE SvSectionCheck;
+TRACE >>> submission_values : $(vSvLoaded) sections avec des lignes, sur $(vSvExpected) au manifeste (ecart = section vide a la source, ou concatenation manquee);
+

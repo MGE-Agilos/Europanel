@@ -432,6 +432,245 @@ for (const page of Object.keys(byPage).map(Number).sort((a, b) => a - b)) {
   writeFile(`page_${String(page).padStart(2, '0')}_${slug}.txt`, out);
 }
 
+// ── 98_submission_values.txt ─────────────────────────────────────────────
+// Toutes les réponses d'un questionnaire en une seule table longue, pour la
+// feuille « détail des soumissions ».
+{
+  const PAGE_TITLES = {
+    0: 'Cover & Contact', 1: 'General Information', 2: 'Plant Layout',
+    3: 'Raw Materials', 4: 'Energy Production', 5: 'Dryer & Press Line',
+    6: 'Air Abatement', 7: 'Air Emissions', 8: 'Water Emissions',
+    9: 'Solid Residues', 10: 'Water Consumption', 11: 'BAT Candidate',
+  };
+
+  // Six colonnes de qualification, identiques pour toutes les tables : c'est
+  // ce que CROSSTABLE laisse intact devant la paire champ/valeur. Leur nombre
+  // est écrit dans chaque instruction, donc il ne peut pas diverger d'une
+  // table à l'autre sans que le rechargement échoue franchement.
+  const QUALIFIERS = 6;
+
+  const lines = [];
+  const push = (...l) => lines.push(...l);
+
+  push(header('submission_values — toutes les réponses en table longue', [
+    'Une ligne par (soumission, section, instance, champ). ~120 000 lignes.',
+    '',
+    'Pourquoi une table longue plutôt que trente tableaux posés à la main :',
+    'compter ce qui MANQUE suppose de connaître la liste des champs attendus.',
+    'Un tableau construit à la main ne connaît que les champs qu\'il affiche,',
+    'et ne peut donc rien dire d\'un champ vide. Cette table tient sa liste du',
+    'manifeste, donc elle suit le questionnaire sans que personne y pense.',
+    '',
+    'Toutes les colonnes sont préfixées sv_ sauf submission_id, qui est le',
+    'lien voulu avec le reste du modèle. Sans ce préfixe, « code », « idx »',
+    'ou « field » rencontreraient leurs homonymes dans quinze autres tables',
+    'et Qlik fabriquerait des clés synthétiques par le milieu du modèle.',
+    '',
+    'À inclure APRÈS toutes les sections de page : tout ici est du RESIDENT.',
+  ]));
+
+  // ── tables de correspondance vers les parents ───────────────────────────
+  const parents = [...new Set(Object.values(SCHEMA)
+    .filter(e => e.parent).map(e => e.parent))].sort();
+
+  if (parents.length) {
+    push('// Les tables à clés imbriquées ne portent pas submission_id : leur seul',
+         '// lien est l\'identifiant de leur parent répétable. On y remonte la',
+         '// soumission et le numéro d\'instance du parent.');
+    for (const p of parents) {
+      const col = PARENT_COL_OF[p];
+      push(`Map_${p}_sub:`,
+           `MAPPING LOAD [${col}], [submission_id] RESIDENT [${p}];`,
+           `Map_${p}_idx:`,
+           `MAPPING LOAD [${col}], [${p}_idx] RESIDENT [${p}];`,
+           '');
+    }
+    // Le type de cheminée sert de second axe aux bornes d'anomalie ci-dessous.
+    // Il est le seul attribut de parent dont le calcul ait besoin ; les autres
+    // n'auraient aucun usage et alourdiraient le rechargement pour rien.
+    push('Map_emission_points_desc:',
+         'MAPPING LOAD [emission_point_id], [emission_points_waste_gas_desc] ' +
+           'RESIDENT [emission_points];',
+         '');
+  }
+
+  // ── bornes statistiques des concentrations ──────────────────────────────
+  push(
+    '// Bornes d\'anomalie, calculées ici et non dans un graphique : le seuil',
+    '// d\'un polluant dépend de toute la distribution du panel, donc d\'un',
+    '// balayage complet. Le refaire à chaque rafraîchissement d\'écran coûte',
+    '// cher pour un résultat qui ne change qu\'au rechargement.',
+    '//',
+    '// P75 + 3 × écart interquartile : la clôture de Tukey, élargie de 1,5 à 3',
+    '// pour ne signaler que l\'aberration franche. Une collecte volontaire a',
+    '// des valeurs légitimement dispersées ; à 1,5 on noierait le secrétariat',
+    '// sous des alertes qui ne sont que la réalité du secteur.',
+    '//',
+    '// Groupé par polluant ET par type de cheminée : 10 mg/Nm³ de',
+    '// formaldéhyde n\'a pas le même sens sur un séchoir au bois recyclé et',
+    '// sur un filtre de ponçage (voir le mouvement 04 du parcours).',
+    'EpConcTmp:',
+    'LOAD',
+    '\t[emission_point_pollutants_code] & \'|\' & ' +
+      `ApplyMap('Map_emission_points_desc', [emission_point_id], '?') as [sv_gkey_tmp],`,
+    '\t[emission_point_pollutants_conc] as [conc_tmp]',
+    'RESIDENT [emission_point_pollutants]',
+    'WHERE Len([emission_point_pollutants_conc]) > 0;',
+    '',
+    'FenceMap:',
+    'MAPPING LOAD',
+    '\t[sv_gkey_tmp],',
+    '\tFractile([conc_tmp], 0.75) + 3 * (Fractile([conc_tmp], 0.75) - Fractile([conc_tmp], 0.25))',
+    'RESIDENT EpConcTmp',
+    'GROUP BY [sv_gkey_tmp];',
+    '',
+    'DROP TABLE EpConcTmp;',
+    '');
+
+  // ── un CROSSTABLE par table du manifeste ────────────────────────────────
+  push(
+    '// Chaque valeur est passée par If(IsNull(...), \'\', ...) et non chargée',
+    '// telle quelle. CROSSTABLE n\'émet AUCUNE ligne pour une cellule nulle :',
+    '// un champ laissé vide par l\'opérateur n\'existerait tout simplement pas',
+    '// dans la table longue, et la feuille ne pourrait pas le signaler — elle',
+    '// ne saurait pas distinguer « rempli » de « jamais rempli », qui est',
+    '// pourtant la première chose que le contrôle qualité cherche.',
+    '//',
+    '// NullAsValue a été essayé d\'abord, et ne suffit pas : la ligne est',
+    '// écartée au pivot, avant que la conversion ne s\'applique.',
+    '//',
+    '// La valeur n\'est PAS passée par Text() ici : cela détruirait sa part',
+    '// numérique, et sv_num, calculé dans la passe finale, resterait vide',
+    '// pour toutes les réponses chiffrées. La conversion en texte se fait en',
+    '// fin de course, quand la valeur numérique a déjà été prélevée.',
+    '');
+
+  const RAW = 'submission_values_raw';
+  let sections = 0;
+  let first = true;
+
+  for (const [table, entry] of Object.entries(SCHEMA)) {
+    const cols = Object.keys(entry.cols);
+    if (!cols.length) continue;
+
+    const page = entry.page;
+    let subExpr, instExpr, codeExpr, gkeyExpr;
+
+    if (entry.parent) {
+      const col = entry.parentCol;
+      subExpr = `ApplyMap('Map_${entry.parent}_sub', [${col}]) as [submission_id]`;
+      instExpr = `ApplyMap('Map_${entry.parent}_idx', [${col}]) as [sv_instance]`;
+    } else {
+      subExpr = '[submission_id]';
+      instExpr = entry.kind === 'many'
+        ? `[${table}_idx] as [sv_instance]`
+        : 'null() as [sv_instance]';
+    }
+
+    codeExpr = entry.kind === 'keyed'
+      ? `[${table}_ref_label] as [sv_code]`
+      : 'null() as [sv_code]';
+
+    // Seules les concentrations d'air ont une borne : ailleurs, sv_gkey reste
+    // vide et l'état ne peut pas valoir HORS PLAGE.
+    gkeyExpr = table === 'emission_point_pollutants'
+      ? `[emission_point_pollutants_code] & '|' & ` +
+        `ApplyMap('Map_emission_points_desc', [emission_point_id], '?') as [sv_gkey]`
+      : 'null() as [sv_gkey]';
+
+    // Pas de préfixe CONCATENATE : Qlik refuse « Illegal combination of
+    // prefixes » sur CONCATENATE suivi de CROSSTABLE. On s'appuie donc sur
+    // la concaténation automatique — chaque pivot produit exactement les
+    // mêmes huit champs que le précédent, puisque c'est le même générateur
+    // qui les écrit, et Qlik empile alors sans qu'on le demande.
+    //
+    // Cette commodité est aussi un risque : le jour où un pivot produirait
+    // un champ de plus, Qlik ouvrirait une table à part sans rien dire et la
+    // table longue partirait incomplète. D'où le garde-fou en fin de fichier,
+    // qui compare le nombre de sections chargées à celui que le manifeste a
+    // écrit ici.
+    push(`// ${table} — page ${page}`);
+    if (first) push(`[${RAW}]:`);
+    first = false;
+    push(`CROSSTABLE([sv_field], [sv_value], ${QUALIFIERS})`,
+         'LOAD',
+         `\t${subExpr},`,
+         `\t${page} as [sv_page],`,
+         `\t'${table}' as [sv_section],`,
+         `\t${instExpr},`,
+         `\t${codeExpr},`,
+         `\t${gkeyExpr},`,
+         ...cols.map((c, i) =>
+           `\tIf(IsNull([${table}_${c}]), '', [${table}_${c}]) as [${c}]` +
+           (i === cols.length - 1 ? '' : ',')),
+         `RESIDENT [${table}];`,
+         '');
+    sections++;
+  }
+
+  // ── passe finale ────────────────────────────────────────────────────────
+  push(
+    '// Libellé de page, valeur numérique quand il y en a une, et état.',
+    'PageTitleMap:',
+    'MAPPING LOAD * INLINE [',
+    '\tpage, title',
+    ...Object.entries(PAGE_TITLES).map(([p, t]) => `\t${p}, ${p}. ${t}`),
+    '];',
+    '',
+    '[submission_values]:',
+    'LOAD',
+    '\t[submission_id],',
+    '\t[sv_page],',
+    `\tApplyMap('PageTitleMap', [sv_page], [sv_page]) as [sv_page_label],`,
+    '\t[sv_section],',
+    '\t[sv_instance],',
+    '\t[sv_code],',
+    '\t[sv_field],',
+    '\t// Un tiret, et non la chaîne vide. CROSSTABLE empile dans une seule',
+    '\t// colonne les valeurs de trente-cinq tables ; elle finit interprétée',
+    '\t// comme numérique, et une chaîne vide s\'y affiche « NaN » — ce que le',
+    '\t// lecteur prendrait pour une erreur de calcul plutôt que pour une',
+    '\t// réponse manquante. Le tiret est déduit du test de longueur, jamais',
+    '\t// posé à la source : rien ne dépend de sa présence.',
+    '\tIf(Len(Trim([sv_value])) = 0, \'—\', Text([sv_value])) as [sv_value],',
+    '\tIf(IsNum([sv_value]), Num([sv_value])) as [sv_num],',
+    '\tIf(Len(Trim([sv_value])) = 0, 0, 1) as [sv_filled],',
+    '\t// Un champ vide est d\'abord un champ vide : le signaler comme hors',
+    '\t// plage n\'aurait pas de sens, et masquerait la seule chose à faire,',
+    '\t// qui est de retourner le demander à l\'opérateur.',
+    '\tIf(Len(Trim([sv_value])) = 0, \'VIDE\',',
+    '\t\tIf(Len([sv_gkey]) > 0 and [sv_field] = \'conc\'',
+    `\t\t\tand Num([sv_value]) > ApplyMap('FenceMap', [sv_gkey], 1E15),`,
+    '\t\t\t\'HORS PLAGE\', \'OK\')) as [sv_state]',
+    `RESIDENT [${RAW}];`,
+    '',
+    `DROP TABLE [${RAW}];`,
+    '');
+
+  // Trace de contrôle. L'empilement des pivots repose sur la concaténation
+  // automatique de Qlik, qui ne prévient pas quand elle ne s'applique pas :
+  // une section resterait dans sa propre table et la table longue partirait
+  // incomplète, sans la moindre erreur. Les deux nombres sont donc écrits
+  // côte à côte dans le journal de rechargement.
+  //
+  // Un écart n'est pas forcément une panne : une section dont la table source
+  // est vide — aucun opérateur n'a rien saisi — n'apporte aucune ligne et ne
+  // compte donc pas. C'est le cas de raw_material_specify dans le jeu de
+  // démonstration. L'écart mérite un coup d'œil, pas une alerte.
+  push(
+    'SvSectionCheck:',
+    'LOAD Count(DISTINCT [sv_section]) as [n] RESIDENT [submission_values];',
+    `LET vSvExpected = ${sections};`,
+    "LET vSvLoaded = Peek('n', 0, 'SvSectionCheck');",
+    'DROP TABLE SvSectionCheck;',
+    'TRACE >>> submission_values : $(vSvLoaded) sections avec des lignes, ' +
+      'sur $(vSvExpected) au manifeste (ecart = section vide a la source, ' +
+      'ou concatenation manquee);',
+    '');
+
+  writeFile('98_submission_values.txt', lines.join('\n') + '\n');
+}
+
 // ── fichier d'assemblage ─────────────────────────────────────────────────
 {
   const pageFiles = Object.keys(byPage).map(Number).sort((a, b) => a - b)
@@ -453,6 +692,9 @@ for (const page of Object.keys(byPage).map(Number).sort((a, b) => a - b)) {
     `$(Must_Include=${DATA_FILES_LIB}/01_ref_lists.txt);`,
     `$(Must_Include=${DATA_FILES_LIB}/02_whatif.txt);`,
     ...pageFiles.map(f => `$(Must_Include=${DATA_FILES_LIB}/${f});`),
+    '',
+    '// En dernier : tout y est du RESIDENT sur les tables ci-dessus.',
+    `$(Must_Include=${DATA_FILES_LIB}/98_submission_values.txt);`,
   ];
   writeFile('99_main.txt', lines.join('\n') + '\n');
 }

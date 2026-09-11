@@ -29,3 +29,6 @@ $(Must_Include=lib://Europanel:DataFiles/page_08_waste_water.txt);
 $(Must_Include=lib://Europanel:DataFiles/page_09_solid_waste.txt);
 $(Must_Include=lib://Europanel:DataFiles/page_10_water_consumption.txt);
 $(Must_Include=lib://Europanel:DataFiles/page_11_bat_candidate.txt);
+
+// En dernier : tout y est du RESIDENT sur les tables ci-dessus.
+$(Must_Include=lib://Europanel:DataFiles/98_submission_values.txt);
