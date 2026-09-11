@@ -58,6 +58,30 @@ const PAGE_SLUGS = {
 // d'émission SQL, plus une liste de champs calculés (RefKey) à ajouter au
 // LOAD sans qu'ils existent côté SQL SELECT.
 
+// ── Colonnes calculées propres à une table ───────────────────────────────
+// Ce que le tableau de bord a besoin de découper autrement que ne le fait
+// la base. Le calcul appartient au script et non à une dimension calculée
+// dans un graphique : une expression enfouie dans un objet n'est visible
+// que de qui l'ouvre, ne se réutilise pas d'un graphique à l'autre, et se
+// recalcule à chaque rafraîchissement au lieu d'une fois au chargement.
+const RefLabelExpr = `ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code])`;
+
+const EXTRA_COMPUTED = {
+  // Polluants comparables sur un axe de concentration massique. L'odeur
+  // (ouE/m³) et les PCDD/PCDF (ng I-TEQ/Nm³) n'en sont pas : les porter sur
+  // le même axe que des mg/Nm³ produirait un graphique dont l'échelle est
+  // fixée par une grandeur sans rapport. Null les écarte proprement — une
+  // dimension Qlik ignore ses valeurs nulles — sans supprimer les lignes,
+  // qui restent lisibles partout ailleurs.
+  //
+  // ApplyMap est répété au lieu de renvoyer à l'alias : dans un même LOAD,
+  // une expression ne voit pas les « as » définis plus haut dans la liste.
+  emission_point_pollutants: [{
+    expr: `If(Match(${RefLabelExpr}, 'Odour', 'PCDD/PCDF') = 0, ${RefLabelExpr})`,
+    qlikName: 'emission_point_pollutants_mass_label',
+  }],
+};
+
 function planManifestTable(table, entry) {
   const cols = [];
   const computed = [];
@@ -123,6 +147,7 @@ function planManifestTable(table, entry) {
       expr: `ApplyMap('RefUnitMap', [list_code] & '|' & [code], null())`,
       qlikName: `${table}_ref_unit`,
     });
+    for (const extra of EXTRA_COMPUTED[table] || []) computed.push(extra);
     return { cols, computed };
   }
 
@@ -352,6 +377,36 @@ function writeFile(name, content) {
   writeFile('01_ref_lists.txt', out);
 }
 
+// ── 02_whatif.txt ────────────────────────────────────────────────────────
+{
+  const out = header('Échelles de simulation — tables îlots', [
+    'Une table îlot n\'a de clé commune avec aucune autre : elle ne se lie à',
+    'rien, et c\'est voulu. Ses valeurs servent d\'axe à une simulation, pas',
+    'de filtre sur les données — sélectionner 15 mg/Nm³ ne doit écarter',
+    'aucune mesure, seulement déplacer le seuil que la mesure compare.',
+    '',
+    'Pourquoi ici et non dans un « =ValueList(5, 10, 15, 20) » au fond d\'un',
+    'graphique : une échelle écrite dans une expression de dimension doit',
+    'être répétée à l\'identique dans chaque mesure qui la compare. Les deux',
+    'copies dérivent le jour où l\'on ajoute un palier à une seule des deux,',
+    'et le graphique compte alors au mauvais seuil sans rien signaler.',
+  ]) + [
+    '',
+    '// Paliers d\'AEL candidats discutés en groupe de travail (mg/Nm³).',
+    '// Ajouter un palier ici suffit : le graphique le reprend au rechargement.',
+    'CandidateAEL:',
+    'LOAD * INLINE [',
+    '\tcandidate_ael',
+    '\t5',
+    '\t10',
+    '\t15',
+    '\t20',
+    '];',
+    '',
+  ].join('\n');
+  writeFile('02_whatif.txt', out);
+}
+
 // ── un fichier par page ──────────────────────────────────────────────────
 const byPage = {};
 for (const [table, entry] of Object.entries(SCHEMA)) {
@@ -396,6 +451,7 @@ for (const page of Object.keys(byPage).map(Number).sort((a, b) => a - b)) {
     ]),
     `$(Must_Include=${DATA_FILES_LIB}/00_core.txt);`,
     `$(Must_Include=${DATA_FILES_LIB}/01_ref_lists.txt);`,
+    `$(Must_Include=${DATA_FILES_LIB}/02_whatif.txt);`,
     ...pageFiles.map(f => `$(Must_Include=${DATA_FILES_LIB}/${f});`),
   ];
   writeFile('99_main.txt', lines.join('\n') + '\n');

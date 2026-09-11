@@ -16,6 +16,7 @@
 
 $(Must_Include=lib://Europanel:DataFiles/00_core.txt);
 $(Must_Include=lib://Europanel:DataFiles/01_ref_lists.txt);
+$(Must_Include=lib://Europanel:DataFiles/02_whatif.txt);
 $(Must_Include=lib://Europanel:DataFiles/page_00_contacts.txt);
 $(Must_Include=lib://Europanel:DataFiles/page_01_general_info.txt);
 $(Must_Include=lib://Europanel:DataFiles/page_02_plant_layout.txt);

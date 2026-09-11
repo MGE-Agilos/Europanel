@@ -1,0 +1,26 @@
+// ═══════════════════════════════════════════════════════════════════
+// EuroPanel — Échelles de simulation — tables îlots
+// Généré par tools/gen_qlik_load_script.mjs — ne pas éditer à la main :
+// toute correction doit passer par docs/fields.js puis régénérer.
+// Une table îlot n'a de clé commune avec aucune autre : elle ne se lie à
+// rien, et c'est voulu. Ses valeurs servent d'axe à une simulation, pas
+// de filtre sur les données — sélectionner 15 mg/Nm³ ne doit écarter
+// aucune mesure, seulement déplacer le seuil que la mesure compare.
+// 
+// Pourquoi ici et non dans un « =ValueList(5, 10, 15, 20) » au fond d'un
+// graphique : une échelle écrite dans une expression de dimension doit
+// être répétée à l'identique dans chaque mesure qui la compare. Les deux
+// copies dérivent le jour où l'on ajoute un palier à une seule des deux,
+// et le graphique compte alors au mauvais seuil sans rien signaler.
+// ═══════════════════════════════════════════════════════════════════
+
+// Paliers d'AEL candidats discutés en groupe de travail (mg/Nm³).
+// Ajouter un palier ici suffit : le graphique le reprend au rechargement.
+CandidateAEL:
+LOAD * INLINE [
+	candidate_ael
+	5
+	10
+	15
+	20
+];

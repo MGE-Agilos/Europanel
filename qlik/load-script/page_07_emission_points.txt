@@ -90,7 +90,7 @@ LOOP WHILE vEpRows = $(vEpPageSize)
 // incomplète ; une page vide est sans effet (vérifié dans l'application).
 [emission_point_pollutants]:
 LOAD * INLINE [
-emission_point_pollutants_id, emission_point_id, emission_point_pollutants_code, emission_point_pollutants_conc, emission_point_pollutants_method, emission_point_pollutants_t_year, emission_point_pollutants_short_term, emission_point_pollutants_short_val, emission_point_pollutants_limit_val, emission_point_pollutants_updated_at, emission_point_pollutants_ref_label, emission_point_pollutants_ref_unit
+emission_point_pollutants_id, emission_point_id, emission_point_pollutants_code, emission_point_pollutants_conc, emission_point_pollutants_method, emission_point_pollutants_t_year, emission_point_pollutants_short_term, emission_point_pollutants_short_val, emission_point_pollutants_limit_val, emission_point_pollutants_updated_at, emission_point_pollutants_ref_label, emission_point_pollutants_ref_unit, emission_point_pollutants_mass_label
 ];
 
 LET vEpOffset = 0;
@@ -126,7 +126,8 @@ DO
 		[limit_val] as [emission_point_pollutants_limit_val],
 		[updated_at] as [emission_point_pollutants_updated_at],
 		ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code]) as [emission_point_pollutants_ref_label],
-		ApplyMap('RefUnitMap', [list_code] & '|' & [code], null()) as [emission_point_pollutants_ref_unit]
+		ApplyMap('RefUnitMap', [list_code] & '|' & [code], null()) as [emission_point_pollutants_ref_unit],
+		If(Match(ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code]), 'Odour', 'PCDD/PCDF') = 0, ApplyMap('RefLabelMap', [list_code] & '|' & [code], [code])) as [emission_point_pollutants_mass_label]
 	RESIDENT RestConnectorMasterTable2;
 
 	DROP TABLE RestConnectorMasterTable2;
