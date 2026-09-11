@@ -236,28 +236,39 @@ export async function apply(client, led, log) {
 /* ══ Execution ═══════════════════════════════════════════════════════ */
 
 const USAGE = [
-  'Usage : node supabase/seed/demo_data_cleanup.mjs [--dry-run|--apply]',
+  'Usage : node supabase/seed/demo_data_cleanup.mjs [--dry-run|--apply] [--ledger <chemin>]',
   '',
-  '  --dry-run  (defaut) enumere ce qui serait supprime, n\'ecrit rien',
-  '  --apply    supprime les lignes consignees dans .demo-seed-ids.json',
+  '  --dry-run        (defaut) enumere ce qui serait supprime, n\'ecrit rien',
+  '  --apply          supprime les lignes consignees dans le registre',
+  '  --ledger <chemin> registre a defaire (defaut : .demo-seed-ids.json)',
   '',
   'Ce script ne supprime que les identifiants presents dans le registre.',
+  'Le seed est pose par vagues, chacune avec son propre registre : defaire',
+  'une vague demande de designer le sien.',
 ].join('\n');
 
 export async function run(argv) {
   let apply_ = false;
-  for (const a of argv) {
+  let ledgerFile = null;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
     if (a === '--apply') { apply_ = true; continue; }
     if (a === '--dry-run') { continue; }
+    if (a === '--ledger') {
+      ledgerFile = argv[++i];
+      if (!ledgerFile) throw new Error('--ledger attend un chemin\n' + USAGE);
+      continue;
+    }
     if (a === '--help' || a === '-h') { console.log(USAGE); return 0; }
     throw new Error('argument inconnu : ' + a + '\n' + USAGE);
   }
 
-  const led = readLedger();
+  const target = ledgerFile ? path.resolve(ledgerFile) : IDS_FILE;
+  const led = readLedger(target);
 
   if (!apply_) {
     console.log('══ Nettoyage du seed de demonstration — MODE A BLANC ═════════');
-    console.log('  registre : ' + IDS_FILE);
+    console.log('  registre : ' + target);
     console.log('  pose le  : ' + led.started_at +
                 (led.finished_at ? '  (termine ' + led.finished_at + ')'
                                  : '  (RUN INCOMPLET)'));
@@ -297,9 +308,9 @@ export async function run(argv) {
 
   // Le registre est conserve, renomme : il reste la trace de ce qui a
   // existe, et une seconde execution ne peut pas le relire par megarde.
-  const done = IDS_FILE.replace(/\.json$/, '') + '.removed-' +
+  const done = target.replace(/\.json$/, '') + '.removed-' +
                new Date().toISOString().replace(/[:.]/g, '-') + '.json';
-  fs.renameSync(IDS_FILE, done);
+  fs.renameSync(target, done);
   console.log('  Registre archive : ' + done);
   return 0;
 }

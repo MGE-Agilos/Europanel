@@ -193,76 +193,291 @@ function setKeyed(flat, table, code, values, parentIdx) {
    construits sur des toponymes et des mots communs, dans dix pays de
    l'Union, pour que le filtre « pays » du tableau de bord ait de quoi
    travailler. */
+// La repartition suit la concentration reelle du secteur telle que l'EPF
+// la publie : l'Allemagne, la Pologne et l'Italie pesent lourd, une longue
+// traine de pays ne compte qu'un site. Un panel ou chaque pays apporterait
+// le meme nombre de sites ne ressemblerait a aucune industrie, et un
+// graphique « sites par pays » y serait un escalier plat sans information.
 export const COMPANIES = [
-  { key: 'nordhavn',  name: 'Nordhavn Panelworks A/S',       country: 'Denmark' },
-  { key: 'verdalia',  name: 'Verdalia Tableros SL',          country: 'Spain' },
-  { key: 'silvater',  name: 'Silvaterra Pannelli SpA',       country: 'Italy' },
-  { key: 'baltfib',   name: 'Baltic Fibreboard Group SIA',   country: 'Latvia' },
-  { key: 'lindenw',   name: 'Lindenwerk Holzplatten GmbH',   country: 'Germany' },
-  { key: 'ardenne',   name: 'Ardenne Panneaux SA',           country: 'Belgium' },
-  { key: 'vistula',   name: 'Vistula Plyta Sp. z o.o.',      country: 'Poland' },
-  { key: 'norrskog',  name: 'Norrskog Skivindustri AB',      country: 'Sweden' },
-  { key: 'douro',     name: 'Douro Compositos Lda',          country: 'Portugal' },
-  { key: 'moravia',   name: 'Moravia Desky a.s.',            country: 'Czech Republic' },
+  // ── poids lourds ────────────────────────────────────────────────
+  { key: 'lindenw',  name: 'Lindenwerk Holzplatten GmbH',   country: 'Germany' },
+  { key: 'rheinsp',  name: 'Rheinspan Werke AG',            country: 'Germany' },
+  { key: 'harzholz', name: 'Harzholz Plattenwerke GmbH',    country: 'Germany' },
+  { key: 'vistula',  name: 'Vistula Plyta Sp. z o.o.',      country: 'Poland' },
+  { key: 'bialowie', name: 'Bialowieza Panele SA',          country: 'Poland' },
+  { key: 'silvater', name: 'Silvaterra Pannelli SpA',       country: 'Italy' },
+  { key: 'padania',  name: 'Padania Legno Srl',             country: 'Italy' },
+  { key: 'boisred',  name: 'Bois du Redon SAS',             country: 'France' },
+  { key: 'vosgesp',  name: 'Vosges Panneaux SAS',           country: 'France' },
+  { key: 'verdalia', name: 'Verdalia Tableros SL',          country: 'Spain' },
+  { key: 'ibertab',  name: 'Ibertablero SA',               country: 'Spain' },
+  // ── milieu de tableau ───────────────────────────────────────────
+  { key: 'carpatpl', name: 'Carpatica Placaje SRL',         country: 'Romania' },
+  { key: 'anatolia', name: 'Anatolia Panel AS',             country: 'Turkey' },
+  { key: 'alpenpl',  name: 'Alpenplatten Werke GmbH',       country: 'Austria' },
+  { key: 'ardenne',  name: 'Ardenne Panneaux SA',           country: 'Belgium' },
+  { key: 'moravia',  name: 'Moravia Desky a.s.',            country: 'Czech Republic' },
+  { key: 'douro',    name: 'Douro Compositos Lda',          country: 'Portugal' },
+  { key: 'norrskog', name: 'Norrskog Skivindustri AB',      country: 'Sweden' },
+  // ── un site chacun ──────────────────────────────────────────────
+  { key: 'metsalev', name: 'Metsalevy Oy',                  country: 'Finland' },
+  { key: 'pennineb', name: 'Pennine Boards Ltd',            country: 'United Kingdom' },
+  { key: 'nordhavn', name: 'Nordhavn Panelworks A/S',       country: 'Denmark' },
+  { key: 'baltfib',  name: 'Baltic Fibreboard Group SIA',   country: 'Latvia' },
+  { key: 'nemunas',  name: 'Nemunas Plokstes UAB',          country: 'Lithuania' },
+  { key: 'peipsi',   name: 'Peipsi Plaaditehas AS',         country: 'Estonia' },
+  { key: 'pannonlap',name: 'Pannonia Lapgyar Zrt.',         country: 'Hungary' },
+  { key: 'tatradosk',name: 'Tatra Dosky s.r.o.',            country: 'Slovakia' },
+  { key: 'triglav',  name: 'Triglav Plosce d.o.o.',         country: 'Slovenia' },
+  { key: 'slavonp',  name: 'Slavonija Ploce d.o.o.',        country: 'Croatia' },
+  { key: 'rodopip',  name: 'Rodopi Panels AD',              country: 'Bulgaria' },
+  { key: 'pindosp',  name: 'Pindos Panel SA',               country: 'Greece' },
+  { key: 'shannon',  name: 'Shannon Board Products Ltd',    country: 'Ireland' },
+  { key: 'delftpan', name: 'Delft Paneelfabriek BV',        country: 'Netherlands' },
+  { key: 'fjordsk',  name: 'Fjordskiva AS',                 country: 'Norway' },
 ];
 
 /* ── Sites de production ────────────────────────────────────────────
    `scale` pilote le tonnage, la puissance thermique installee et les debits
-   de gaz ; `trend` la derive des concentrations d'une campagne a l'autre
-   (< 1 = site qui s'ameliore, > 1 = site qui derive). `profile` decide des
-   polluants pertinents pour chaque cheminee. */
+   de gaz ; `cap` etale la capacite a l'interieur d'un meme palier, pour que
+   la production annuelle ne se resume pas a trois valeurs repetees ; `trend`
+   donne la derive des concentrations d'une campagne a l'autre (< 1 = site
+   qui s'ameliore, > 1 = site qui derive) ; `dirt` la salete relative, qui
+   decide aussi du profil des cheminees.
+
+   `joined` et `skips` pilotent la PARTICIPATION, pas les mesures :
+
+     · `joined` est la premiere annee de reference pour laquelle le site a
+       repondu. Un panel ne nait pas complet : l'EPF recrute ses membres au
+       fil des campagnes, et c'est ce qui fait qu'un graphe « reponses par
+       annee de reference » monte au lieu d'etre un rectangle plat.
+
+     · `skips` enumere les annees ou le site n'a rien rendu alors qu'il
+       faisait deja partie du panel. La non-reponse ponctuelle existe dans
+       toute collecte volontaire ; sans elle, le taux de completion serait
+       de 100 % partout et la page « qualite des donnees » n'aurait rien a
+       montrer.
+
+   Le nombre de sites par societe est lui aussi inegal — de un a quatre —
+   comme l'est le nombre de societes par pays. Un panel ou chaque societe
+   exploiterait le meme nombre de sites ne ressemblerait a aucune industrie. */
 export const PLANTS = [
-  { key: 'p01', company: 'nordhavn', name: 'Nordhavn Panelworks — Aalborg Mill',
-    city: 'Aalborg', country: 'Denmark', started: 1987, scale: 'large',
-    products: ['PB', 'MDF'], trend: 0.94, dirt: 1.00 },
-  { key: 'p02', company: 'nordhavn', name: 'Nordhavn Panelworks — Kolding Mill',
-    city: 'Kolding', country: 'Denmark', started: 2004, scale: 'medium',
-    products: ['MDF'], trend: 0.96, dirt: 0.82 },
-  { key: 'p03', company: 'verdalia', name: 'Verdalia Tableros — Soria Plant',
-    city: 'Soria', country: 'Spain', started: 1978, scale: 'large',
-    products: ['PB', 'OSB'], trend: 1.02, dirt: 1.25 },
-  { key: 'p04', company: 'silvater', name: 'Silvaterra Pannelli — Udine Works',
-    city: 'Udine', country: 'Italy', started: 1995, scale: 'medium',
-    products: ['MDF', 'HDF'], trend: 0.98, dirt: 1.05 },
-  { key: 'p05', company: 'silvater', name: 'Silvaterra Pannelli — Viterbo Works',
-    city: 'Viterbo', country: 'Italy', started: 2011, scale: 'small',
-    products: ['HB'], trend: 0.93, dirt: 0.70 },
-  { key: 'p06', company: 'baltfib', name: 'Baltic Fibreboard — Jelgava Mill',
-    city: 'Jelgava', country: 'Latvia', started: 1969, scale: 'medium',
-    products: ['SB', 'HB'], trend: 1.05, dirt: 1.40 },
-  { key: 'p07', company: 'lindenw', name: 'Lindenwerk Holzplatten — Eberswalde',
+  /* ── Allemagne : 7 sites, 3 societes ──────────────────────────── */
+  { key: 'p01', company: 'lindenw', name: 'Lindenwerk Holzplatten — Eberswalde',
     city: 'Eberswalde', country: 'Germany', started: 1999, scale: 'large',
-    products: ['PB', 'MDF', 'HDF'], trend: 0.95, dirt: 0.88 },
-  { key: 'p08', company: 'lindenw', name: 'Lindenwerk Holzplatten — Memmingen',
+    cap: 1.22, products: ['PB', 'MDF', 'HDF'], trend: 0.95, dirt: 0.88, joined: 2021 },
+  { key: 'p02', company: 'lindenw', name: 'Lindenwerk Holzplatten — Memmingen',
     city: 'Memmingen', country: 'Germany', started: 2013, scale: 'medium',
-    products: ['OSB'], trend: 0.97, dirt: 0.75 },
-  { key: 'p09', company: 'ardenne', name: 'Ardenne Panneaux — Marche-en-Famenne',
-    city: 'Marche-en-Famenne', country: 'Belgium', started: 1991, scale: 'medium',
-    products: ['PB'], trend: 0.99, dirt: 0.95 },
-  { key: 'p10', company: 'vistula', name: 'Vistula Plyta — Grudziadz Plant',
+    cap: 0.94, products: ['OSB'], trend: 0.97, dirt: 0.75, joined: 2021 },
+  { key: 'p03', company: 'lindenw', name: 'Lindenwerk Holzplatten — Lueneburg',
+    city: 'Lueneburg', country: 'Germany', started: 1978, scale: 'large',
+    cap: 1.41, products: ['PB', 'OSB'], trend: 0.93, dirt: 1.04, joined: 2021,
+    skips: [2023] },
+  { key: 'p04', company: 'rheinsp', name: 'Rheinspan Werke — Wesel Plant',
+    city: 'Wesel', country: 'Germany', started: 1985, scale: 'large',
+    cap: 1.08, products: ['PB', 'MDF'], trend: 0.96, dirt: 1.12, joined: 2021 },
+  { key: 'p05', company: 'rheinsp', name: 'Rheinspan Werke — Koblenz Plant',
+    city: 'Koblenz', country: 'Germany', started: 2008, scale: 'medium',
+    cap: 1.03, products: ['MDF', 'HDF'], trend: 0.91, dirt: 0.69, joined: 2022 },
+  { key: 'p06', company: 'harzholz', name: 'Harzholz Plattenwerke — Goslar Mill',
+    city: 'Goslar', country: 'Germany', started: 1972, scale: 'medium',
+    cap: 0.86, products: ['HB', 'SB'], trend: 1.02, dirt: 1.33, joined: 2021 },
+  { key: 'p07', company: 'harzholz', name: 'Harzholz Plattenwerke — Nordhausen',
+    city: 'Nordhausen', country: 'Germany', started: 2016, scale: 'small',
+    cap: 1.18, products: ['MBH'], trend: 0.89, dirt: 0.54, joined: 2024 },
+
+  /* ── Pologne : 6 sites, 2 societes ────────────────────────────── */
+  { key: 'p08', company: 'vistula', name: 'Vistula Plyta — Grudziadz Plant',
     city: 'Grudziadz', country: 'Poland', started: 1984, scale: 'large',
-    products: ['PB', 'MDF'], trend: 1.03, dirt: 1.30 },
-  { key: 'p11', company: 'vistula', name: 'Vistula Plyta — Zamosc Plant',
+    cap: 1.35, products: ['PB', 'MDF'], trend: 1.03, dirt: 1.30, joined: 2021 },
+  { key: 'p09', company: 'vistula', name: 'Vistula Plyta — Zamosc Plant',
     city: 'Zamosc', country: 'Poland', started: 2007, scale: 'medium',
-    products: ['MDF'], trend: 0.96, dirt: 0.90 },
-  { key: 'p12', company: 'norrskog', name: 'Norrskog Skivindustri — Umea Mill',
-    city: 'Umea', country: 'Sweden', started: 1973, scale: 'medium',
-    products: ['HB', 'MBH'], trend: 0.92, dirt: 0.68 },
-  { key: 'p13', company: 'douro', name: 'Douro Compositos — Oliveira Plant',
-    city: 'Oliveira de Azemeis', country: 'Portugal', started: 2001, scale: 'small',
-    products: ['MDF'], trend: 1.01, dirt: 1.10 },
-  { key: 'p14', company: 'moravia', name: 'Moravia Desky — Bruntal Works',
+    cap: 0.91, products: ['MDF'], trend: 0.96, dirt: 0.90, joined: 2021 },
+  { key: 'p10', company: 'vistula', name: 'Vistula Plyta — Plock Works',
+    city: 'Plock', country: 'Poland', started: 1996, scale: 'large',
+    cap: 1.16, products: ['OSB', 'PB'], trend: 1.00, dirt: 1.19, joined: 2022 },
+  { key: 'p11', company: 'vistula', name: 'Vistula Plyta — Suwalki Plant',
+    city: 'Suwalki', country: 'Poland', started: 2019, scale: 'small',
+    cap: 1.27, products: ['MDF'], trend: 0.88, dirt: 0.49, joined: 2024 },
+  { key: 'p12', company: 'bialowie', name: 'Bialowieza Panele — Hajnowka Mill',
+    city: 'Hajnowka', country: 'Poland', started: 1990, scale: 'medium',
+    cap: 0.79, products: ['Other', 'HB'], trend: 1.05, dirt: 1.47, joined: 2021,
+    skips: [2022] },
+  { key: 'p13', company: 'bialowie', name: 'Bialowieza Panele — Ostroleka Plant',
+    city: 'Ostroleka', country: 'Poland', started: 2011, scale: 'large',
+    cap: 1.04, products: ['PB', 'OSB'], trend: 0.94, dirt: 0.81, joined: 2023 },
+
+  /* ── Italie : 5 sites, 2 societes ─────────────────────────────── */
+  { key: 'p14', company: 'silvater', name: 'Silvaterra Pannelli — Udine Works',
+    city: 'Udine', country: 'Italy', started: 1995, scale: 'medium',
+    cap: 1.07, products: ['MDF', 'HDF'], trend: 0.98, dirt: 1.05, joined: 2021 },
+  { key: 'p15', company: 'silvater', name: 'Silvaterra Pannelli — Viterbo Works',
+    city: 'Viterbo', country: 'Italy', started: 2011, scale: 'small',
+    cap: 0.88, products: ['HB'], trend: 0.93, dirt: 0.70, joined: 2021 },
+  { key: 'p16', company: 'silvater', name: 'Silvaterra Pannelli — Cuneo Plant',
+    city: 'Cuneo', country: 'Italy', started: 1981, scale: 'large',
+    cap: 1.19, products: ['PB', 'Other'], trend: 1.01, dirt: 1.24, joined: 2022 },
+  { key: 'p17', company: 'padania', name: 'Padania Legno — Mantova Mill',
+    city: 'Mantova', country: 'Italy', started: 1969, scale: 'medium',
+    cap: 0.83, products: ['SB', 'HB'], trend: 1.06, dirt: 1.58, joined: 2021 },
+  { key: 'p18', company: 'padania', name: 'Padania Legno — Pordenone Plant',
+    city: 'Pordenone', country: 'Italy', started: 2005, scale: 'medium',
+    cap: 1.11, products: ['MDF'], trend: 0.95, dirt: 0.86, joined: 2023 },
+
+  /* ── France : 4 sites, 2 societes ─────────────────────────────── */
+  { key: 'p19', company: 'boisred', name: 'Bois du Redon — Limoges Works',
+    city: 'Limoges', country: 'France', started: 1981, scale: 'large',
+    cap: 1.13, products: ['PB', 'Other'], trend: 1.01, dirt: 1.18, joined: 2021 },
+  { key: 'p20', company: 'boisred', name: 'Bois du Redon — Bordeaux Plant',
+    city: 'Bordeaux', country: 'France', started: 2015, scale: 'medium',
+    cap: 0.97, products: ['MDF', 'HDF'], trend: 0.91, dirt: 0.58, joined: 2022 },
+  { key: 'p21', company: 'vosgesp', name: 'Vosges Panneaux — Epinal Mill',
+    city: 'Epinal', country: 'France', started: 1988, scale: 'medium',
+    cap: 1.06, products: ['PB'], trend: 0.99, dirt: 1.09, joined: 2021 },
+  { key: 'p22', company: 'vosgesp', name: 'Vosges Panneaux — Saint-Die Plant',
+    city: 'Saint-Die-des-Vosges', country: 'France', started: 2003, scale: 'small',
+    cap: 0.74, products: ['HB'], trend: 1.04, dirt: 1.36, joined: 2023,
+    skips: [2024] },
+
+  /* ── Espagne : 4 sites, 2 societes ────────────────────────────── */
+  { key: 'p23', company: 'verdalia', name: 'Verdalia Tableros — Soria Plant',
+    city: 'Soria', country: 'Spain', started: 1978, scale: 'large',
+    cap: 1.28, products: ['PB', 'OSB'], trend: 1.02, dirt: 1.25, joined: 2021 },
+  { key: 'p24', company: 'verdalia', name: 'Verdalia Tableros — Huelva Works',
+    city: 'Huelva', country: 'Spain', started: 1999, scale: 'medium',
+    cap: 0.92, products: ['MDF'], trend: 0.97, dirt: 0.94, joined: 2021 },
+  { key: 'p25', company: 'verdalia', name: 'Verdalia Tableros — Lugo Plant',
+    city: 'Lugo', country: 'Spain', started: 2014, scale: 'small',
+    cap: 1.09, products: ['Other'], trend: 0.90, dirt: 0.62, joined: 2025 },
+  { key: 'p26', company: 'ibertab', name: 'Ibertablero — Valencia Mill',
+    city: 'Valencia', country: 'Spain', started: 1992, scale: 'large',
+    cap: 0.99, products: ['PB', 'MDF', 'HDF'], trend: 0.96, dirt: 1.01, joined: 2022 },
+
+  /* ── Roumanie : 3 sites ───────────────────────────────────────── */
+  { key: 'p27', company: 'carpatpl', name: 'Carpatica Placaje — Brasov Works',
+    city: 'Brasov', country: 'Romania', started: 1968, scale: 'large',
+    cap: 1.17, products: ['Other', 'PB'], trend: 1.06, dirt: 1.62, joined: 2021 },
+  { key: 'p28', company: 'carpatpl', name: 'Carpatica Placaje — Sibiu Plant',
+    city: 'Sibiu', country: 'Romania', started: 2006, scale: 'small',
+    cap: 0.81, products: ['MDF'], trend: 1.02, dirt: 1.22, joined: 2022 },
+  { key: 'p29', company: 'carpatpl', name: 'Carpatica Placaje — Suceava Mill',
+    city: 'Suceava', country: 'Romania', started: 1998, scale: 'medium',
+    cap: 1.02, products: ['PB', 'SB'], trend: 1.03, dirt: 1.41, joined: 2024 },
+
+  /* ── Turquie : 3 sites ────────────────────────────────────────── */
+  { key: 'p30', company: 'anatolia', name: 'Anatolia Panel — Kastamonu Works',
+    city: 'Kastamonu', country: 'Turkey', started: 1994, scale: 'large',
+    cap: 1.46, products: ['PB', 'MDF'], trend: 1.04, dirt: 1.29, joined: 2021 },
+  { key: 'p31', company: 'anatolia', name: 'Anatolia Panel — Adana Plant',
+    city: 'Adana', country: 'Turkey', started: 2009, scale: 'large',
+    cap: 1.31, products: ['MDF', 'HDF'], trend: 0.98, dirt: 1.07, joined: 2022 },
+  { key: 'p32', company: 'anatolia', name: 'Anatolia Panel — Balikesir Mill',
+    city: 'Balikesir', country: 'Turkey', started: 2017, scale: 'medium',
+    cap: 1.14, products: ['OSB'], trend: 0.92, dirt: 0.73, joined: 2023 },
+
+  /* ── Deux sites chacun ────────────────────────────────────────── */
+  { key: 'p33', company: 'alpenpl', name: 'Alpenplatten Werke — Kufstein Mill',
+    city: 'Kufstein', country: 'Austria', started: 1992, scale: 'large',
+    cap: 1.05, products: ['PB', 'MDF'], trend: 0.93, dirt: 0.72, joined: 2021 },
+  { key: 'p34', company: 'alpenpl', name: 'Alpenplatten Werke — Villach Plant',
+    city: 'Villach', country: 'Austria', started: 2009, scale: 'medium',
+    cap: 0.89, products: ['OSB'], trend: 0.95, dirt: 0.64, joined: 2023 },
+  { key: 'p35', company: 'ardenne', name: 'Ardenne Panneaux — Marche-en-Famenne',
+    city: 'Marche-en-Famenne', country: 'Belgium', started: 1991, scale: 'medium',
+    cap: 1.01, products: ['PB'], trend: 0.99, dirt: 0.95, joined: 2021 },
+  { key: 'p36', company: 'ardenne', name: 'Ardenne Panneaux — Genk Plant',
+    city: 'Genk', country: 'Belgium', started: 2012, scale: 'small',
+    cap: 0.93, products: ['MDF'], trend: 0.94, dirt: 0.77, joined: 2024 },
+  { key: 'p37', company: 'moravia', name: 'Moravia Desky — Bruntal Works',
     city: 'Bruntal', country: 'Czech Republic', started: 1965, scale: 'large',
-    products: ['PB', 'OSB'], trend: 1.04, dirt: 1.35 },
+    cap: 1.24, products: ['PB', 'OSB'], trend: 1.04, dirt: 1.35, joined: 2021 },
+  { key: 'p38', company: 'moravia', name: 'Moravia Desky — Jihlava Plant',
+    city: 'Jihlava', country: 'Czech Republic', started: 2002, scale: 'medium',
+    cap: 0.87, products: ['MDF', 'HB'], trend: 0.98, dirt: 1.00, joined: 2022,
+    skips: [2025] },
+  { key: 'p39', company: 'douro', name: 'Douro Compositos — Oliveira Plant',
+    city: 'Oliveira de Azemeis', country: 'Portugal', started: 2001, scale: 'small',
+    cap: 1.12, products: ['MDF'], trend: 1.01, dirt: 1.10, joined: 2021 },
+  { key: 'p40', company: 'douro', name: 'Douro Compositos — Viseu Mill',
+    city: 'Viseu', country: 'Portugal', started: 1986, scale: 'medium',
+    cap: 0.96, products: ['PB', 'Other'], trend: 1.00, dirt: 1.21, joined: 2023 },
+  { key: 'p41', company: 'norrskog', name: 'Norrskog Skivindustri — Umea Mill',
+    city: 'Umea', country: 'Sweden', started: 1973, scale: 'medium',
+    cap: 0.84, products: ['HB', 'MBH'], trend: 0.92, dirt: 0.68, joined: 2021 },
+  { key: 'p42', company: 'norrskog', name: 'Norrskog Skivindustri — Vaxjo Plant',
+    city: 'Vaxjo', country: 'Sweden', started: 2006, scale: 'large',
+    cap: 1.10, products: ['PB', 'MDF'], trend: 0.90, dirt: 0.59, joined: 2022 },
+  { key: 'p43', company: 'metsalev', name: 'Metsalevy — Lahti Mill',
+    city: 'Lahti', country: 'Finland', started: 1974, scale: 'large',
+    cap: 1.20, products: ['Other', 'PB'], trend: 0.96, dirt: 0.83, joined: 2021 },
+  { key: 'p44', company: 'metsalev', name: 'Metsalevy — Kuopio Mill',
+    city: 'Kuopio', country: 'Finland', started: 2003, scale: 'medium',
+    cap: 0.90, products: ['SB', 'HB'], trend: 0.94, dirt: 0.76, joined: 2021,
+    skips: [2023] },
+  { key: 'p45', company: 'pennineb', name: 'Pennine Boards — Leeds Works',
+    city: 'Leeds', country: 'United Kingdom', started: 1990, scale: 'large',
+    cap: 1.07, products: ['PB', 'MDF', 'HDF'], trend: 0.97, dirt: 0.99, joined: 2021 },
+  { key: 'p46', company: 'pennineb', name: 'Pennine Boards — Ayrshire Plant',
+    city: 'Ayr', country: 'United Kingdom', started: 2012, scale: 'medium',
+    cap: 0.95, products: ['OSB'], trend: 0.92, dirt: 0.66, joined: 2022 },
+
+  /* ── Un site chacun ───────────────────────────────────────────── */
+  { key: 'p47', company: 'nordhavn', name: 'Nordhavn Panelworks — Aalborg Mill',
+    city: 'Aalborg', country: 'Denmark', started: 1987, scale: 'large',
+    cap: 1.00, products: ['PB', 'MDF'], trend: 0.94, dirt: 1.00, joined: 2021 },
+  { key: 'p48', company: 'baltfib', name: 'Baltic Fibreboard — Jelgava Mill',
+    city: 'Jelgava', country: 'Latvia', started: 1969, scale: 'medium',
+    cap: 0.82, products: ['SB', 'HB'], trend: 1.05, dirt: 1.40, joined: 2021 },
+  { key: 'p49', company: 'nemunas', name: 'Nemunas Plokstes — Kaunas Mill',
+    city: 'Kaunas', country: 'Lithuania', started: 1994, scale: 'medium',
+    cap: 1.04, products: ['PB', 'Other'], trend: 1.03, dirt: 1.28, joined: 2022 },
+  { key: 'p50', company: 'peipsi', name: 'Peipsi Plaaditehas — Tartu Works',
+    city: 'Tartu', country: 'Estonia', started: 2010, scale: 'small',
+    cap: 1.15, products: ['Other'], trend: 0.93, dirt: 0.69, joined: 2023 },
+  { key: 'p51', company: 'pannonlap', name: 'Pannonia Lapgyar — Szombathely Plant',
+    city: 'Szombathely', country: 'Hungary', started: 2000, scale: 'medium',
+    cap: 0.98, products: ['MDF'], trend: 0.97, dirt: 0.92, joined: 2021 },
+  { key: 'p52', company: 'tatradosk', name: 'Tatra Dosky — Zilina Works',
+    city: 'Zilina', country: 'Slovakia', started: 1988, scale: 'medium',
+    cap: 1.03, products: ['PB', 'MDF'], trend: 0.99, dirt: 1.08, joined: 2022 },
+  { key: 'p53', company: 'triglav', name: 'Triglav Plosce — Maribor Plant',
+    city: 'Maribor', country: 'Slovenia', started: 1999, scale: 'small',
+    cap: 0.76, products: ['MDF'], trend: 0.95, dirt: 0.81, joined: 2024 },
+  { key: 'p54', company: 'slavonp', name: 'Slavonija Ploce — Osijek Works',
+    city: 'Osijek', country: 'Croatia', started: 1971, scale: 'medium',
+    cap: 0.88, products: ['Other', 'HB'], trend: 1.04, dirt: 1.38, joined: 2021,
+    skips: [2024] },
+  { key: 'p55', company: 'rodopip', name: 'Rodopi Panels — Smolyan Mill',
+    city: 'Smolyan', country: 'Bulgaria', started: 1979, scale: 'medium',
+    cap: 0.85, products: ['PB', 'HB'], trend: 1.07, dirt: 1.71, joined: 2023 },
+  { key: 'p56', company: 'pindosp', name: 'Pindos Panel — Larissa Plant',
+    city: 'Larissa', country: 'Greece', started: 1976, scale: 'small',
+    cap: 0.71, products: ['PB'], trend: 1.05, dirt: 1.54, joined: 2022 },
+  { key: 'p57', company: 'shannon', name: 'Shannon Board Products — Limerick Mill',
+    city: 'Limerick', country: 'Ireland', started: 1986, scale: 'medium',
+    cap: 0.94, products: ['MDF', 'PB'], trend: 0.96, dirt: 0.87, joined: 2021 },
+  { key: 'p58', company: 'delftpan', name: 'Delft Paneelfabriek — Moerdijk Plant',
+    city: 'Moerdijk', country: 'Netherlands', started: 1997, scale: 'medium',
+    cap: 1.09, products: ['PB'], trend: 0.98, dirt: 1.45, joined: 2021 },
+  { key: 'p59', company: 'fjordsk', name: 'Fjordskiva — Trondheim Mill',
+    city: 'Trondheim', country: 'Norway', started: 1983, scale: 'medium',
+    cap: 0.91, products: ['SB', 'MBH'], trend: 0.90, dirt: 0.61, joined: 2025 },
 ];
 
 /* ── Campagnes de collecte ──────────────────────────────────────────
-   Deux campagnes closes et une ouverte. `status` est contraint par
+   Quatre campagnes closes et une ouverte. `status` est contraint par
    002_relational_schema.sql :
      CHECK (status IN ('draft','open','closed','archived'))
-   Trois annees de reference distinctes donnent au tableau de bord un axe
-   temporel sur lequel une tendance est lisible. */
+   Cinq annees de reference donnent au tableau de bord un axe temporel sur
+   lequel une tendance est lisible sur plus de deux points — trois points ne
+   distinguent pas une tendance d'un accident. */
 export const CYCLES = [
+  { key: 'c2021', label: '2021 data collection (H1 2023)', reference_year: 2021,
+    opens_at: '2023-01-16', closes_at: '2023-06-23', status: 'closed',
+    subWindow: ['2023-02-27', '2023-06-20'] },
+  { key: 'c2022', label: '2022 data collection (H1 2024)', reference_year: 2022,
+    opens_at: '2024-01-15', closes_at: '2024-06-21', status: 'closed',
+    subWindow: ['2024-03-01', '2024-06-18'] },
   { key: 'c2023', label: '2023 data collection (H1 2025)', reference_year: 2023,
     opens_at: '2025-01-20', closes_at: '2025-06-30', status: 'closed',
     subWindow: ['2025-03-04', '2025-06-27'] },
@@ -274,26 +489,45 @@ export const CYCLES = [
     subWindow: ['2026-09-02', '2026-09-10'] },
 ];
 
-// Sites qui laissent leur soumission de la campagne ouverte a l'etat de
-// brouillon : la demonstration a besoin d'un taux de completion < 100 %
-// pour que le graphe d'avancement dise quelque chose. 4 sur 14 ≈ 71 % de
-// soumissions deposees.
-export const OPEN_CYCLE_DRAFTS = ['p05', 'p06', 'p11', 'p14'];
+// L'indice de campagne est l'annee de reference moins 2023, et non le rang
+// dans le tableau : `trend` est ancre sur 2023, de sorte qu'un site qui
+// s'ameliore (trend < 1) emettait davantage en 2021 et moins en 2025.
+export function cycleIndexOf(cycle) {
+  return cycle.reference_year - 2023;
+}
+
+// Sites qui laissent leur soumission de la campagne ouverte (2025) a l'etat
+// de brouillon : la demonstration a besoin d'un taux de completion < 100 %
+// pour que le graphe d'avancement dise quelque chose. La liste melange
+// deliberement des sites de toutes tailles et de plusieurs pays — si les
+// brouillons etaient tous de petits sites d'Europe de l'Est, le tableau de
+// bord raconterait une histoire que le jeu de donnees n'a pas voulu ecrire.
+export const OPEN_CYCLE_DRAFTS = [
+  'p03', 'p07', 'p11', 'p15', 'p18', 'p22', 'p25',
+  'p29', 'p34', 'p44', 'p50', 'p56', 'p58',
+];
 
 /* ── Anomalies deliberees ───────────────────────────────────────────
-   Trois valeurs (site, polluant, campagne) posees 3 a 6 fois au-dessus de
-   la plage sectorielle, pour que la fonction « identification des valeurs
+   Cinq valeurs (site, polluant, campagne) posees 3 a 6 fois au-dessus de la
+   plage sectorielle, pour que la fonction « identification des valeurs
    aberrantes » du tableau de bord ait quelque chose de reel a trouver.
-   La colonne emission_point_pollutants.method porte le marqueur
-   'periodic' comme les autres : rien ne les signale en base, il faut les
+   Elles sont reparties sur plusieurs annees de reference : une detection qui
+   ne trouverait ses anomalies que dans une seule campagne ne prouverait rien
+   sur sa capacite a en trouver ailleurs.
+   La colonne emission_point_pollutants.method est tiree comme pour n'importe
+   quelle autre mesure : rien en base ne signale ces lignes, il faut les
    detecter statistiquement. */
 export const OUTLIERS = [
-  { plant: 'p06', cycle: 'c2024', point: 1, code: 'hcho', value: 48.6,
+  { plant: 'p48', cycle: 'c2024', point: 1, code: 'hcho', value: 48.6,
     note: 'formaldehyde ~5x la plage sectorielle (2-12 mg/Nm3)' },
-  { plant: 'p14', cycle: 'c2023', point: 3, code: 'pm', value: 62.4,
+  { plant: 'p37', cycle: 'c2023', point: 3, code: 'pm', value: 62.4,
     note: 'poussieres ~4x la plage sectorielle (3-18 mg/Nm3)' },
-  { plant: 'p03', cycle: 'c2025', point: 1, code: 'nox', value: 781,
+  { plant: 'p23', cycle: 'c2025', point: 1, code: 'nox', value: 781,
     note: 'NOx ~3.5x la plage sectorielle (60-250 mg/Nm3)' },
+  { plant: 'p17', cycle: 'c2021', point: 2, code: 'toc', value: 214,
+    note: 'COT ~3.5x la plage sectorielle (8-60 mg/Nm3)' },
+  { plant: 'p30', cycle: 'c2022', point: 1, code: 'so2', value: 187,
+    note: 'SO2 ~4.5x la plage sectorielle (5-40 mg/Nm3)' },
 ];
 
 /* ── Plages sectorielles par polluant (mg/Nm3 sauf mention) ────────
@@ -358,11 +592,20 @@ const SCALE = {
   large:  { prod: 310000, cus: 4, mw: [16, 42], flow: 320000, eps: 3 },
 };
 
+// Reprend a l'identique WBP_TYPES de docs/pages-0-6.js : une valeur absente
+// de cette liste serait ecrite en base sans que le formulaire sache la
+// reafficher, la liste deroulante retombant sur « — select type — ».
+//
+// 'Other' vaut ici contreplaque. Le questionnaire n'offre pas d'option
+// contreplaque, alors que l'EPF compte ce panneau parmi les six qu'elle
+// represente : c'est un manque du formulaire, pas du jeu de donnees, et il
+// est signale comme tel plutot que contourne par une valeur inventee.
 const WBP_LABEL = {
   OSB: 'OSB Oriented Strand Board', PB: 'PB Particle board',
   MDF: 'MDF (dry process)', HDF: 'HDF (dry process)',
   SB: 'SB Softboard', HB: 'HB Hardboard',
   MBH: 'MBH high density medium board',
+  Other: 'Plywood (declared under “Other”)',
 };
 
 const CONTACT_FIRST = ['Anneke', 'Bartosz', 'Cristina', 'Dagmar', 'Emil', 'Frida',
@@ -434,8 +677,10 @@ export function buildFlatPages(ctx) {
   const has = p => wanted.includes(p);
 
   // Volume de production de la campagne : croissance douce d'une annee sur
-  // l'autre, differente par site.
-  const prodTotal = Math.round(sc.prod * (0.92 + 0.16 * rnd()) *
+  // l'autre, differente par site. `cap` etale la capacite a l'interieur du
+  // palier — sans lui, tous les grands sites produiraient a 8 % pres la meme
+  // chose, et un classement par tonnage serait une egalite generale.
+  const prodTotal = Math.round(sc.prod * (plant.cap || 1) * (0.92 + 0.16 * rnd()) *
                                Math.pow(1.025 + (plant.dirt - 1) * 0.01, cycleIdx));
 
   /* ── page 0 — couverture et contacts ───────────────────────────── */
@@ -1105,14 +1350,30 @@ function dateBetween(a, b, frac) {
   return new Date(ta + (tb - ta) * frac).toISOString();
 }
 
+// Un site repond-il pour cette annee de reference ? Deux raisons de ne pas
+// repondre, et une seule facon de les distinguer ensuite dans la base : il
+// n'y a tout simplement pas de ligne. C'est exactement ce que voit l'EPF,
+// qui ne peut pas differencier « pas encore membre » de « membre silencieux »
+// autrement qu'en regardant la date d'adhesion.
+export function respondsTo(plant, cycle) {
+  const year = cycle.reference_year;
+  if (year < plant.joined) return false;
+  return !(plant.skips || []).includes(year);
+}
+
 export function buildDataset() {
   const companyByKey = new Map(COMPANIES.map(c => [c.key, c]));
   const submissions = [];
   let seq = 0;
   let batCounter = 0;
 
-  for (const [cycleIdx, cycle] of CYCLES.entries()) {
+  for (const cycle of CYCLES) {
+    const cycleIdx = cycleIndexOf(cycle);
     for (const plant of PLANTS) {
+      // Le produit cartesien sites x campagnes donnerait le meme nombre de
+      // reponses chaque annee et dans chaque pays. C'est ce filtre, et lui
+      // seul, qui rend les agregats inegaux.
+      if (!respondsTo(plant, cycle)) continue;
       const isOpen = cycle.status === 'open';
       const status = isOpen && OPEN_CYCLE_DRAFTS.includes(plant.key) ? 'draft' : 'submitted';
       const company = companyByKey.get(plant.company);
@@ -1172,9 +1433,14 @@ export function rowsForSubmission(pages) {
 // derriere lui un fichier qui decrit exactement ce qui est deja en base,
 // et le script de nettoyage sait le defaire. L'ecrire seulement a la fin
 // rendrait un run partiel impossible a rattraper autrement qu'a la main.
-export function newLedger() {
+// `file` : ou ce registre doit s'ecrire. Il voyage DANS le registre plutot
+// qu'a cote, pour qu'une vague de seed supplementaire, qui tient son propre
+// registre, ne puisse pas ecraser celui de la premiere en oubliant de passer
+// le chemin a l'un des sept appels de sauvegarde.
+export function newLedger(file) {
   return {
     generated_by: 'supabase/seed/demo_data.mjs',
+    ledger_file: file || IDS_FILE,
     started_at: new Date().toISOString(),
     finished_at: null,
     note: 'Identifiants des lignes AJOUTEES par le seed de demonstration EPF. ' +
@@ -1195,7 +1461,8 @@ function recordTable(ledger, table, pk, ids) {
 }
 
 function saveLedger(ledger, file) {
-  fs.writeFileSync(file || IDS_FILE, JSON.stringify(ledger, null, 2) + '\n', 'utf8');
+  fs.writeFileSync(file || ledger.ledger_file || IDS_FILE,
+                   JSON.stringify(ledger, null, 2) + '\n', 'utf8');
 }
 
 /* ══ Insertion ═══════════════════════════════════════════════════════ */
@@ -1255,14 +1522,20 @@ export function tableOrder() {
   return Object.keys(SCHEMA).sort((a, b) => depthOf(a) - depthOf(b));
 }
 
-export async function apply(client, dataset, ledger, log) {
+// `existing` : identifiants deja en base, par cle locale, sous la forme
+// { companyId, plantId, cycleId, userId } de Map ou d'iterables de paires.
+// Une vague de seed ulterieure s'en sert pour rattacher ses soumissions a des
+// societes, sites et campagnes deja poses, sans les recreer en double. Les
+// tableaux du dataset ne portent alors que les entites NOUVELLES : ce sont
+// eux, et eux seuls, qui donnent lieu a une insertion.
+export async function apply(client, dataset, ledger, log, existing = {}) {
   const counts = {};
   const bump = (t, n) => { counts[t] = (counts[t] || 0) + n; };
 
   /* ── 1. entreprises ───────────────────────────────────────────── */
   const companyRows = dataset.companies.map(c => ({ name: c.name, country: c.country }));
   const companyIns = await insertRows(client, 'companies', companyRows, 'id,name');
-  const companyId = new Map();
+  const companyId = new Map(existing.companyId || []);
   for (const c of dataset.companies) {
     const row = companyIns.find(r => r.name === c.name);
     if (!row) throw new Error('companies : identifiant non rendu pour ' + c.name);
@@ -1278,7 +1551,7 @@ export async function apply(client, dataset, ledger, log) {
     company_id: companyId.get(p.company), name: p.name, country: p.country,
   }));
   const plantIns = await insertRows(client, 'plants', plantRows, 'id,name');
-  const plantId = new Map();
+  const plantId = new Map(existing.plantId || []);
   for (const p of dataset.plants) {
     const row = plantIns.find(r => r.name === p.name);
     if (!row) throw new Error('plants : identifiant non rendu pour ' + p.name);
@@ -1295,7 +1568,7 @@ export async function apply(client, dataset, ledger, log) {
     opens_at: c.opens_at, closes_at: c.closes_at, status: c.status,
   }));
   const cycleIns = await insertRows(client, 'cycles', cycleRows, 'id,label');
-  const cycleId = new Map();
+  const cycleId = new Map(existing.cycleId || []);
   for (const c of dataset.cycles) {
     const row = cycleIns.find(r => r.label === c.label);
     if (!row) throw new Error('cycles : identifiant non rendu pour ' + c.label);
@@ -1310,7 +1583,7 @@ export async function apply(client, dataset, ledger, log) {
   // Les vrais comptes ne sont jamais touches : chaque adresse est creee de
   // toutes pieces sur le TLD .invalid (RFC 2606), donc aucune collision
   // possible avec un compte existant.
-  const userId = new Map();
+  const userId = new Map(existing.userId || []);
   for (const p of dataset.plants) {
     const email = p.key + '.demo@wbp-eurofederation.invalid';
     const { data, error } = await client.auth.admin.createUser({
